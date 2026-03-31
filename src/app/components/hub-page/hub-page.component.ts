@@ -42,7 +42,6 @@ export class HubPageComponent extends PollingComponent {
   launcherOnline = signal(false);
   loading        = signal(false);
   lastUpdated    = signal('—');
-  bulkPending    = signal(false);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -81,7 +80,6 @@ export class HubPageComponent extends PollingComponent {
         };
       }));
 
-      // Auto-refresh any open log panels
       for (const svc of this.services()) {
         if (svc.logsOpen) this.refreshLogs(svc);
       }
@@ -100,47 +98,9 @@ export class HubPageComponent extends PollingComponent {
     try {
       await fetch(`/launcher/services/${svc.id}/${act}`, { method: 'POST' });
       await this.poll();
-      // Extra poll after a delay so status settles
       if (act !== 'stop') setTimeout(() => this.poll(), 2500);
     } finally {
       this.setPending(svc.id, false);
-    }
-  }
-
-  async startAll() {
-    if (!this.launcherOnline() || this.bulkPending()) return;
-    const toStart = this.services().filter(s => s.managed && s.status === 'offline');
-    if (!toStart.length) return;
-
-    this.bulkPending.set(true);
-    toStart.forEach(s => this.setPending(s.id, true));
-    try {
-      await Promise.all(toStart.map(s =>
-        fetch(`/launcher/services/${s.id}/start`, { method: 'POST' })
-      ));
-      await this.poll();
-      setTimeout(() => this.poll(), 3000);
-    } finally {
-      toStart.forEach(s => this.setPending(s.id, false));
-      this.bulkPending.set(false);
-    }
-  }
-
-  async stopAll() {
-    if (!this.launcherOnline() || this.bulkPending()) return;
-    const toStop = this.services().filter(s => s.managed && s.status === 'online');
-    if (!toStop.length) return;
-
-    this.bulkPending.set(true);
-    toStop.forEach(s => this.setPending(s.id, true));
-    try {
-      await Promise.all(toStop.map(s =>
-        fetch(`/launcher/services/${s.id}/stop`, { method: 'POST' })
-      ));
-      await this.poll();
-    } finally {
-      toStop.forEach(s => this.setPending(s.id, false));
-      this.bulkPending.set(false);
     }
   }
 
