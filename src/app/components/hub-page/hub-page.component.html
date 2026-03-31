@@ -1,0 +1,161 @@
+<div class="hub">
+
+  <!-- ── Header ─────────────────────────────────────────────────────────── -->
+  <div class="hub-header">
+    <div class="hub-header-left">
+      <h1 class="hub-title">🎮 Project Hub</h1>
+      <span class="launcher-badge" [class.online]="launcherOnline()">
+        {{ launcherOnline() ? '● Launcher connected' : '○ Launcher offline' }}
+      </span>
+      <span class="last-update">{{ lastUpdated() }}</span>
+    </div>
+    <div class="hub-header-right">
+      <button class="btn btn-start"
+              [disabled]="!launcherOnline() || bulkPending()"
+              (click)="startAll()">
+        ▶ Start All
+      </button>
+      <button class="btn btn-stop"
+              [disabled]="!launcherOnline() || bulkPending()"
+              (click)="stopAll()">
+        ■ Stop All
+      </button>
+      <button class="btn btn-ghost" (click)="poll()" [disabled]="loading()">
+        <span [class.spinning]="loading()">↻</span> Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Launcher offline warning ───────────────────────────────────────── -->
+  @if (!launcherOnline()) {
+    <div class="banner banner-warn">
+      <span>⚠️</span>
+      <div>
+        <strong>Launcher not running.</strong>
+        Start it with <code>npm start</code> in the <code>project_hub</code> folder.
+      </div>
+    </div>
+  }
+
+  <!-- ── Service Cards ──────────────────────────────────────────────────── -->
+  <div class="cards">
+    @for (svc of services(); track svc.id) {
+
+      <div class="card" [class]="'card-' + svc.status"
+           [style.--accent]="svc.color_hint">
+
+        <!-- Card Header -->
+        <div class="card-header">
+          <div class="card-header-left">
+            <span class="status-icon" [style.color]="statusMeta(svc.status).color">
+              {{ statusMeta(svc.status).icon }}
+            </span>
+            <div>
+              <div class="card-title-row">
+                <span class="card-title">{{ svc.label }}</span>
+                @if (svc.is_gui) {
+                  <span class="badge badge-gui" title="Opens a desktop window">🖥 GUI</span>
+                }
+                <span class="badge badge-health">{{ svc.health_check }}</span>
+              </div>
+              <div class="card-desc">{{ svc.description }}</div>
+            </div>
+          </div>
+
+          <div class="card-header-right">
+            @if (svc.pid) {
+              <span class="pid-badge">PID {{ svc.pid }}</span>
+            }
+            <span class="status-pill"
+                  [style.color]="statusMeta(svc.status).color"
+                  [style.border-color]="statusMeta(svc.status).color + '55'"
+                  [style.background]="statusMeta(svc.status).color + '18'">
+              @if (svc.status === 'starting' || svc.status === 'stopping') {
+                <span class="pill-spinner"></span>
+              }
+              {{ statusMeta(svc.status).label }}
+            </span>
+          </div>
+        </div>
+
+        <!-- GUI notice -->
+        @if (svc.is_gui) {
+          <div class="gui-notice">
+            🖥 This app opens a <strong>desktop window</strong> when launched.
+            Close the window to stop it, or use the Stop button below.
+          </div>
+        }
+
+        <!-- Controls -->
+        <div class="card-controls">
+          @if (svc.status === 'starting' || svc.status === 'stopping') {
+            <div class="pending-label">
+              <span class="inline-spinner"></span>
+              {{ svc.status === 'starting' ? 'Starting…' : 'Stopping…' }}
+            </div>
+          } @else {
+            @if (svc.status === 'offline' || svc.status === 'unhealthy') {
+              <button class="btn btn-start"
+                      [disabled]="svc.actionPending || !launcherOnline()"
+                      (click)="action(svc, 'start')">
+                {{ svc.actionPending ? 'Starting…' : '▶ Start' }}
+              </button>
+            }
+            @if (svc.status === 'online' || svc.status === 'unhealthy') {
+              <button class="btn btn-stop"
+                      [disabled]="svc.actionPending || !launcherOnline()"
+                      (click)="action(svc, 'stop')">
+                {{ svc.actionPending ? 'Stopping…' : '■ Stop' }}
+              </button>
+            }
+            @if (svc.status === 'online') {
+              <button class="btn btn-restart"
+                      [disabled]="svc.actionPending || !launcherOnline()"
+                      (click)="action(svc, 'restart')">
+                {{ svc.actionPending ? 'Restarting…' : '↺ Restart' }}
+              </button>
+            }
+          }
+
+          <button class="btn btn-vscode"
+                  [disabled]="!svc.cwd"
+                  (click)="openVscode(svc)"
+                  title="Open folder in VS Code">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" class="vscode-logo">
+              <path d="M74.5 7.27L51.5 27.79 32.17 11.5 25 15.08v69.84l7.17 3.58L51.5 72.21 74.5 92.73 90 85.5V14.5L74.5 7.27zM74.5 74.08L54.07 50 74.5 25.92V74.08z"/>
+            </svg>
+            VS Code
+          </button>
+
+          <button class="btn btn-ghost log-toggle" (click)="toggleLogs(svc)">
+            {{ svc.logsOpen ? '▲ Hide logs' : '▼ Logs' }}
+          </button>
+        </div>
+
+        <!-- Log Panel -->
+        @if (svc.logsOpen) {
+          <div class="log-panel">
+            <div class="log-toolbar">
+              <span class="log-title">stdout — {{ svc.label }}</span>
+              <button class="log-btn" (click)="refreshLogs(svc)">↻ Refresh</button>
+              <button class="log-btn" (click)="clearLogs(svc)">✕ Clear</button>
+            </div>
+            <div class="log-body">
+              @for (line of svc.logs ?? []; track $index) {
+                <div class="log-line"
+                     [class.err]="isErr(line)"
+                     [class.ok]="isOk(line)"
+                     [class.warn]="isWarn(line)">{{ line }}</div>
+              }
+              @if (!(svc.logs?.length)) {
+                <div class="log-empty">No output captured yet.</div>
+              }
+            </div>
+          </div>
+        }
+
+      </div>
+    }
+  </div>
+
+</div>

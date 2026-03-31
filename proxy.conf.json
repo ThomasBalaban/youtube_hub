@@ -1,0 +1,3 @@
+{
+  "/launcher": { "target": "http://localhost:8010", "secure": false }
+}
