@@ -80,25 +80,29 @@ export class PublisherPageComponent extends PollingComponent {
   readonly Math = Math;
 
   // ── State ──────────────────────────────────────────────────────────────────
-  selectedMode  = signal<RunMode>('publisher_batch');
-  videoCount    = signal(50);
-  testMode      = signal(false);
-  serviceStatus = signal<ServiceStatus | null>(null);
+  selectedMode   = signal<RunMode>('publisher_batch');
+  videoCount     = signal(50);
+  testMode       = signal(false);
+  serviceStatus  = signal<ServiceStatus | null>(null);
   launcherOnline = signal(false);
-  saving        = signal(false);
-  saveError     = signal('');
-  saveDone      = signal(false);
-  actionPending = signal(false);
-  loading       = signal(false);
-  lastUpdated   = signal('—');
+  saving         = signal(false);
+  saveError      = signal('');
+  saveDone       = signal(false);
+  actionPending  = signal(false);
+  loading        = signal(false);
+  lastUpdated    = signal('—');
   settingsLoaded = signal(false);
 
+  // ── Log state ──────────────────────────────────────────────────────────────
+  logs        = signal<string[]>([]);
+  logsLoading = signal(false);
+
   // ── Computed ───────────────────────────────────────────────────────────────
-  isRunning = computed(() => this.serviceStatus()?.status === 'online');
+  isRunning  = computed(() => this.serviceStatus()?.status === 'online');
   isStarting = computed(() => this.serviceStatus()?.status === 'starting');
   isStopping = computed(() => this.serviceStatus()?.status === 'stopping');
   showVideoCount = computed(() => this.selectedMode() === 'publisher_batch');
-  showTestMode = computed(() =>
+  showTestMode   = computed(() =>
     this.selectedMode() === 'publisher_single' || this.selectedMode() === 'publisher_batch'
   );
 
@@ -115,7 +119,12 @@ export class PublisherPageComponent extends PollingComponent {
     return map[s] ?? map['unknown'];
   });
 
-  // ── Init ───────────────────────────────────────────────────────────────────
+  // ── Log helpers ────────────────────────────────────────────────────────────
+  isErr  = (l: string) => /error|failed|exception|traceback|fatal/i.test(l);
+  isOk   = (l: string) => /✅|healthy|ready|started|running/i.test(l);
+  isWarn = (l: string) => /warn|warning|⚠/i.test(l);
+
+  // ── Init / Polling ─────────────────────────────────────────────────────────
   override async poll() {
     this.loading.set(true);
     try {
@@ -147,6 +156,27 @@ export class PublisherPageComponent extends PollingComponent {
     } finally {
       this.loading.set(false);
     }
+
+    // Always refresh logs on each poll tick
+    await this.refreshLogs();
+  }
+
+  // ── Log actions ────────────────────────────────────────────────────────────
+  async refreshLogs() {
+    if (!this.launcherOnline()) return;
+    try {
+      const res = await fetch('/launcher/services/youtube_publisher/logs?last=200');
+      if (!res.ok) return;
+      const data = await res.json();
+      this.logs.set(data.lines ?? []);
+    } catch { /* silent */ }
+  }
+
+  async clearLogs() {
+    try {
+      await fetch('/launcher/services/youtube_publisher/logs', { method: 'DELETE' });
+      this.logs.set([]);
+    } catch { /* silent */ }
   }
 
   // ── Actions ────────────────────────────────────────────────────────────────

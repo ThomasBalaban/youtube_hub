@@ -181,5 +181,39 @@
 
     </section>
 
+    <!-- ── Log Panel ───────────────────────────────────────────────────── -->
+    <section class="section log-section">
+      <div class="log-header">
+        <div class="log-header-left">
+          <h2 class="section-title" style="margin:0">stdout — Publisher</h2>
+          @if (isRunning()) {
+            <span class="live-badge">● live</span>
+          }
+        </div>
+        <div class="log-header-right">
+          <button class="log-action-btn" (click)="refreshLogs()" title="Refresh logs">
+            ↻ Refresh
+          </button>
+          <button class="log-action-btn log-action-btn--clear" (click)="clearLogs()" title="Clear logs">
+            ✕ Clear
+          </button>
+        </div>
+      </div>
+
+      <div class="log-body">
+        @for (line of logs(); track $index) {
+          <div class="log-line"
+               [class.err]="isErr(line)"
+               [class.ok]="isOk(line)"
+               [class.warn]="isWarn(line)">{{ line }}</div>
+        }
+        @if (!logs().length) {
+          <div class="log-empty">
+            No output yet — start the publisher to see logs here.
+          </div>
+        }
+      </div>
+    </section>
+
   </div><!-- /pub-body -->
 </div>

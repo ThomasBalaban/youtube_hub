@@ -229,7 +229,7 @@
 .mode-icon {
   font-size: 1.5rem;
   line-height: 1;
-  position: relative; // above ::before
+  position: relative;
 }
 
 .mode-label {
@@ -342,7 +342,6 @@
   padding: 5px 4px;
   font-family: monospace;
 
-  // Hide spin arrows
   &::-webkit-inner-spin-button,
   &::-webkit-outer-spin-button { -webkit-appearance: none; }
 
@@ -454,6 +453,109 @@
   border-top-color: currentColor;
   animation: spin 0.65s linear infinite;
   flex-shrink: 0;
+}
+
+// ── Log Panel ─────────────────────────────────────────────────────────────────
+.log-section {
+  padding: 0;
+  overflow: hidden;
+  // Grow to fill remaining body space so the log box is as tall as possible
+  flex: 1;
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+}
+
+.log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 1rem;
+  background: #161616;
+  border-bottom: 1px solid #2a2a2a;
+  flex-shrink: 0;
+  gap: 0.75rem;
+}
+
+.log-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.log-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.live-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  padding: 2px 7px;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+  animation: pulse-badge 2s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}
+
+.log-action-btn {
+  background: none;
+  border: 1px solid #2a2a2a;
+  border-radius: 5px;
+  color: #4b5563;
+  font-size: 0.72rem;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: all 0.12s;
+
+  &:hover {
+    background: #1e1e1e;
+    color: #9ca3af;
+    border-color: #444;
+  }
+
+  &--clear {
+    &:hover {
+      color: #f87171;
+      border-color: rgba(248, 113, 113, 0.4);
+      background: rgba(248, 113, 113, 0.06);
+    }
+  }
+}
+
+.log-body {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  font-family: 'Courier New', monospace;
+  font-size: 0.7rem;
+  line-height: 1.7;
+  background: #0d0d0d;
+  overflow-y: auto;
+  color: #9ca3af;
+  // Let the body scroll within the section rather than making the whole page scroll
+  min-height: 0;
+}
+
+.log-line {
+  white-space: pre-wrap;
+  word-break: break-all;
+
+  &.err  { color: #f87171; }
+  &.ok   { color: #4ade80; }
+  &.warn { color: #fbbf24; }
+}
+
+.log-empty {
+  color: #374151;
+  font-style: italic;
 }
 
 // ── Animation ─────────────────────────────────────────────────────────────────

@@ -134,7 +134,7 @@ async def start_service(name: str) -> Dict[str, Any]:
 
     is_module = "-m" in defn["cmd"]
     entry     = defn["cmd"][-1]
-    if not is_module and not os.path.exists(entry):
+    if not is_module and not os.path.exists(os.path.join(defn.get("cwd", THIS_DIR), entry)):
         msg = f"Entry point not found: {entry}"
         _append_log(name, f"❌ {msg}")
         return {"ok": False, "reason": msg}
@@ -144,13 +144,18 @@ async def start_service(name: str) -> Dict[str, Any]:
     _append_log(name, f"    cmd: {' '.join(str(c) for c in defn['cmd'])}")
     _append_log(name, f"    cwd: {defn.get('cwd', THIS_DIR)}")
 
+    # Ensure Python output is never buffered regardless of how the interpreter
+    # was invoked (belt-and-suspenders alongside the -u flag in the cmd).
+    proc_env = os.environ.copy()
+    proc_env["PYTHONUNBUFFERED"] = "1"
+
     try:
         p = subprocess.Popen(
             defn["cmd"],
             cwd=defn.get("cwd", THIS_DIR),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            env=os.environ.copy(),
+            env=proc_env,
         )
         _procs[name] = p
         threading.Thread(
@@ -239,7 +244,9 @@ async def lifespan(app: FastAPI):
             continue
         is_module = "-m" in defn["cmd"]
         entry     = defn["cmd"][-1]
-        exists    = is_module or os.path.exists(entry)
+        exists    = is_module or os.path.exists(
+            os.path.join(defn.get("cwd", THIS_DIR), entry)
+        )
         print(f"   {'✅' if exists else '❌'} {defn['label']:25s} → {entry}")
 
     yield
