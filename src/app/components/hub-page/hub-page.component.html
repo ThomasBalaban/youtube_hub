@@ -1,30 +1,31 @@
 <div class="hub">
 
   <!-- ── Header ─────────────────────────────────────────────────────────── -->
-  <div class="hub-header">
-    <div class="hub-header-left">
-      <h1 class="hub-title">🎮 Project Hub</h1>
-      <span class="launcher-badge" [class.online]="launcherOnline()">
-        {{ launcherOnline() ? '● Launcher connected' : '○ Launcher offline' }}
-      </span>
-      <span class="last-update">{{ lastUpdated() }}</span>
-    </div>
-    <div class="hub-header-right">
-      <button class="btn btn-start"
-              [disabled]="!launcherOnline() || bulkPending()"
-              (click)="startAll()">
-        ▶ Start All
-      </button>
-      <button class="btn btn-stop"
-              [disabled]="!launcherOnline() || bulkPending()"
-              (click)="stopAll()">
-        ■ Stop All
-      </button>
-      <button class="btn btn-ghost" (click)="poll()" [disabled]="loading()">
-        <span [class.spinning]="loading()">↻</span> Refresh
-      </button>
-    </div>
+<div class="hub-header">
+  <div class="hub-header-left">
+    <h1 class="hub-title">🎮 Project Hub</h1>
+    <span class="launcher-badge" [class.online]="launcherOnline()">
+      {{ launcherOnline() ? '● Launcher connected' : '○ Launcher offline' }}
+    </span>
+    <span class="last-update">{{ lastUpdated() }}</span>
   </div>
+  <div class="hub-header-right">
+    <a routerLink="/publisher" class="btn btn-nav">▶ YT Publisher</a>
+    <button class="btn btn-start"
+            [disabled]="!launcherOnline() || bulkPending()"
+            (click)="startAll()">
+      ▶ Start All
+    </button>
+    <button class="btn btn-stop"
+            [disabled]="!launcherOnline() || bulkPending()"
+            (click)="stopAll()">
+      ■ Stop All
+    </button>
+    <button class="btn btn-ghost" (click)="poll()" [disabled]="loading()">
+      <span [class.spinning]="loading()">↻</span> Refresh
+    </button>
+  </div>
+</div>
 
   <!-- ── Launcher offline warning ───────────────────────────────────────── -->
   @if (!launcherOnline()) {

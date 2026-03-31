@@ -1,0 +1,185 @@
+<div class="pub-page">
+
+  <!-- ── Header ─────────────────────────────────────────────────────────── -->
+  <div class="pub-header">
+    <div class="pub-header-left">
+      <a routerLink="/" class="back-btn" title="Back to Hub">
+        <span class="back-arrow">←</span>
+        <span>Hub</span>
+      </a>
+      <div class="title-block">
+        <h1 class="pub-title">
+          <span class="yt-icon">▶</span> YouTube Shorts Publisher
+        </h1>
+        <span class="sub-label">Configure run mode &amp; launch</span>
+      </div>
+    </div>
+
+    <div class="pub-header-right">
+      <!-- Service Status Pill -->
+      <div class="status-strip"
+           [style.--sc]="statusMeta().color">
+        @if (isStarting() || isStopping()) {
+          <span class="strip-spinner"></span>
+        } @else {
+          <span class="strip-dot">{{ statusMeta().icon }}</span>
+        }
+        <span class="strip-label">{{ statusMeta().label }}</span>
+        @if (serviceStatus()?.pid) {
+          <span class="strip-pid">PID {{ serviceStatus()!.pid }}</span>
+        }
+      </div>
+
+      <span class="last-upd">{{ lastUpdated() }}</span>
+    </div>
+  </div>
+
+  <!-- ── Launcher offline banner ─────────────────────────────────────────── -->
+  @if (!launcherOnline()) {
+    <div class="banner-warn">
+      ⚠ Launcher offline — start it with <code>npm start</code>
+    </div>
+  }
+
+  <!-- ── Body ───────────────────────────────────────────────────────────── -->
+  <div class="pub-body">
+
+    <!-- ── Mode Selection ─────────────────────────────────────────────── -->
+    <section class="section">
+      <h2 class="section-title">Run Mode</h2>
+      <p class="section-hint">Pick what the publisher should do when it starts.</p>
+
+      <div class="mode-grid">
+        @for (m of modes; track m) {
+          <button
+            class="mode-card"
+            [class.active]="selectedMode() === m"
+            [style.--mc]="MODE_META[m].color"
+            (click)="selectMode(m)">
+            <span class="mode-icon">{{ MODE_META[m].icon }}</span>
+            <span class="mode-label">{{ MODE_META[m].label }}</span>
+            <span class="mode-desc">{{ MODE_META[m].desc }}</span>
+            <span class="mode-check">✓</span>
+          </button>
+        }
+      </div>
+    </section>
+
+    <!-- ── Additional Settings ────────────────────────────────────────── -->
+    <section class="section">
+      <h2 class="section-title">Options</h2>
+
+      <div class="options-list">
+
+        <!-- Video Count — only for batch -->
+        @if (showVideoCount()) {
+          <div class="option-row" [class.dim]="!showVideoCount()">
+            <div class="option-info">
+              <span class="option-name">Videos to Process</span>
+              <span class="option-desc">How many drafts to schedule in a single run</span>
+            </div>
+            <div class="count-control">
+              <button class="count-btn" (click)="videoCount.set(Math.max(1, videoCount() - 1))">−</button>
+              <input
+                class="count-input"
+                type="number"
+                min="1"
+                max="500"
+                [ngModel]="videoCount()"
+                (ngModelChange)="videoCount.set($event)"
+              />
+              <button class="count-btn" (click)="videoCount.set(Math.min(500, videoCount() + 1))">+</button>
+            </div>
+          </div>
+        }
+
+        <!-- Test Mode — only for publisher modes -->
+        @if (showTestMode()) {
+          <div class="option-row">
+            <div class="option-info">
+              <span class="option-name">Test Mode</span>
+              <span class="option-desc">
+                Fill in metadata &amp; previews, but <strong>skip the final Save/Publish</strong> click
+              </span>
+            </div>
+            <button
+              class="toggle"
+              [class.on]="testMode()"
+              (click)="testMode.set(!testMode())"
+              [attr.aria-pressed]="testMode()">
+              <span class="toggle-knob"></span>
+            </button>
+          </div>
+        }
+
+        <!-- Placeholder when no extra options -->
+        @if (!showVideoCount() && !showTestMode()) {
+          <div class="no-options">No additional options for this mode.</div>
+        }
+
+      </div>
+    </section>
+
+    <!-- ── Controls ───────────────────────────────────────────────────── -->
+    <section class="section controls-section">
+
+      <div class="ctrl-row">
+        <!-- Save -->
+        <button
+          class="btn btn-save"
+          [disabled]="saving() || !launcherOnline()"
+          (click)="saveSettings()">
+          @if (saving()) {
+            <span class="btn-spin"></span> Saving…
+          } @else if (saveDone()) {
+            ✓ Saved
+          } @else {
+            💾 Save Settings
+          }
+        </button>
+
+        <!-- Save & Run -->
+        <button
+          class="btn btn-run"
+          [disabled]="saving() || actionPending() || !launcherOnline() || isRunning() || isStarting()"
+          (click)="saveAndRun()">
+          @if (actionPending() && !isRunning()) {
+            <span class="btn-spin"></span> Starting…
+          } @else {
+            ▶ Save &amp; Run
+          }
+        </button>
+
+        <!-- Stop -->
+        @if (isRunning() || isStarting()) {
+          <button
+            class="btn btn-stop"
+            [disabled]="actionPending() || isStopping() || !launcherOnline()"
+            (click)="serviceAction('stop')">
+            @if (isStopping()) {
+              <span class="btn-spin"></span> Stopping…
+            } @else {
+              ■ Stop
+            }
+          </button>
+        }
+
+        <!-- Restart -->
+        @if (isRunning()) {
+          <button
+            class="btn btn-restart"
+            [disabled]="actionPending() || !launcherOnline()"
+            (click)="serviceAction('restart')">
+            ↺ Restart
+          </button>
+        }
+      </div>
+
+      @if (saveError()) {
+        <div class="error-msg">⚠ {{ saveError() }}</div>
+      }
+
+    </section>
+
+  </div><!-- /pub-body -->
+</div>
