@@ -18,12 +18,20 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         <span class="nav-label">Hub</span>
       </a>
 
+      <a routerLink="/subtitler"
+         routerLinkActive="active"
+         class="nav-item"
+         title="SimpleAutoSubs">
+        <span class="nav-icon">💬</span>
+        <span class="nav-label">Subs</span>
+      </a>
+
       <a routerLink="/publisher"
          routerLinkActive="active"
          class="nav-item"
          title="YouTube Publisher">
         <span class="nav-icon">▶</span>
-        <span class="nav-label">Publisher</span>
+        <span class="nav-label">Publish</span>
       </a>
     </nav>
   `,

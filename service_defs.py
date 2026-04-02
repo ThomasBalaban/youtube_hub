@@ -69,15 +69,27 @@ def conda_python(env_name: str) -> str:
 
 SERVICE_DEFS: Dict[str, Dict[str, Any]] = {
     "simple_auto_subs": {
-        "label":        "SimpleAutoSubs",
+        "label":        "SimpleAutoSubs (GUI)",
         "description":  "Auto-transcribes mic & desktop audio, embeds comic-book onomatopoeia, and generates AI titles for gaming clips",
         "cmd":          [conda_python("simpleautosubs"), "main.py"],
         "cwd":          os.path.join(PARENT_DIR, "SimpleAutoSubs"),
         "port":         None,
         "health_check": "process",
         "managed":      True,
-        "is_gui":       True,          # Opens a tkinter window
+        "is_gui":       True,
         "color_hint":   "#63e2b7",     # teal
+    },
+    "simple_auto_subs_api": {
+        "label":        "SimpleAutoSubs API",
+        "description":  "Headless REST API for the Hub to queue videos, change settings, and run subtitle processing without the GUI",
+        "cmd":          [conda_python("simpleautosubs"), "-u", "api_server.py"],
+        "cwd":          os.path.join(PARENT_DIR, "SimpleAutoSubs"),
+        "port":         8020,
+        "health_check": "http",
+        "health_url":   "http://localhost:8020/health",
+        "managed":      True,
+        "is_gui":       False,
+        "color_hint":   "#34d399",     # emerald
     },
     "youtube_publisher": {
         "label":        "YouTube Shorts Publisher",
@@ -87,7 +99,7 @@ SERVICE_DEFS: Dict[str, Dict[str, Any]] = {
         "port":         None,
         "health_check": "process",
         "managed":      True,
-        "is_gui":       True,          # Headed Playwright (browser opens)
+        "is_gui":       True,
         "color_hint":   "#f87171",     # red
     },
 
@@ -107,6 +119,7 @@ SERVICE_DEFS: Dict[str, Dict[str, Any]] = {
 
 # How many times to poll the health check before giving up on startup
 BOOT_RETRIES: Dict[str, int] = {
-    "simple_auto_subs":  5,
-    "youtube_publisher": 8,
+    "simple_auto_subs":     5,
+    "simple_auto_subs_api": 12,   # Heavier imports — give it more time
+    "youtube_publisher":    8,
 }
