@@ -4,281 +4,248 @@
   <div class="sub-header">
     <div class="sub-header-left">
       <a routerLink="/" class="back-btn" title="Back to Hub">
-        <span class="back-arrow">←</span>
-        <span>Hub</span>
+        <span class="back-arrow">←</span><span>Hub</span>
       </a>
       <div class="title-block">
-        <h1 class="sub-title">
-          <span class="sub-icon">💬</span> SimpleAutoSubs
-        </h1>
+        <h1 class="sub-title"><span class="sub-icon">💬</span> SimpleAutoSubs</h1>
         <span class="sub-label">Queue videos, adjust settings, and process without the GUI</span>
       </div>
     </div>
-
     <div class="sub-header-right">
       <div class="status-strip" [style.--sc]="serviceStatusMeta().color">
-        @if (actionPending()) {
-          <span class="strip-spinner"></span>
-        } @else {
-          <span class="strip-dot">{{ serviceStatusMeta().icon }}</span>
-        }
+        @if (actionPending()) { <span class="strip-spinner"></span> }
+        @else { <span class="strip-dot">{{ serviceStatusMeta().icon }}</span> }
         <span class="strip-label">{{ serviceStatusMeta().label }}</span>
-        @if (serviceStatus()?.pid) {
-          <span class="strip-pid">PID {{ serviceStatus()!.pid }}</span>
-        }
+        @if (serviceStatus()?.pid) { <span class="strip-pid">PID {{ serviceStatus()!.pid }}</span> }
       </div>
-
       @if (serviceStatus()?.status === 'offline' || serviceStatus()?.status === 'unknown') {
         <button class="btn btn-start-api" [disabled]="actionPending() || !launcherOnline()"
-                (click)="serviceAction('start')">
-          ▶ Start API
-        </button>
+                (click)="serviceAction('start')">▶ Start API</button>
       } @else if (serviceStatus()?.status === 'online') {
         <button class="btn btn-stop-api" [disabled]="actionPending() || isProcessing()"
-                (click)="serviceAction('stop')">
-          ■ Stop API
-        </button>
+                (click)="serviceAction('stop')">■ Stop API</button>
       }
-
       <span class="last-upd">{{ lastUpdated() }}</span>
     </div>
   </div>
 
-  <!-- ── Offline banners ─────────────────────────────────────────────────── -->
+  <!-- ── Banners ─────────────────────────────────────────────────────────── -->
   @if (!launcherOnline()) {
-    <div class="banner banner-warn">
-      ⚠ Launcher offline — start it with <code>npm start</code>
-    </div>
+    <div class="banner banner-warn">⚠ Launcher offline — start it with <code>npm start</code></div>
   } @else if (!apiOnline()) {
-    <div class="banner banner-info">
-      💡 Start the SimpleAutoSubs API using the button above, then you can queue files and process them here.
-    </div>
+    <div class="banner banner-info">💡 Start the SimpleAutoSubs API using the button above to queue files and process them.</div>
   }
 
-  <!-- ── Body ───────────────────────────────────────────────────────────── -->
-  <div class="sub-body">
+  <!-- ── Two-panel body ──────────────────────────────────────────────────── -->
+  <div class="sub-panels">
 
-    <!-- ── File Queue ──────────────────────────────────────────────────── -->
-    <section class="section">
-      <div class="section-header">
-        <div>
-          <h2 class="section-title">File Queue</h2>
-          @if (files().length > 0) {
-            <div class="queue-counts">
-              @if (processStatus()?.queued) {
-                <span class="count-pill queued">{{ processStatus()!.queued }} queued</span>
-              }
-              @if (processStatus()?.done) {
-                <span class="count-pill done">{{ processStatus()!.done }} done</span>
-              }
-              @if (processStatus()?.errors) {
-                <span class="count-pill error">{{ processStatus()!.errors }} errors</span>
-              }
+    <!-- ── LEFT: controls ──────────────────────────────────────────────── -->
+    <div class="left-panel">
+
+      <!-- File Queue -->
+      <section class="section">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">File Queue</h2>
+            @if (files().length > 0) {
+              <div class="queue-counts">
+                @if (processStatus()?.queued) { <span class="count-pill queued">{{ processStatus()!.queued }} queued</span> }
+                @if (processStatus()?.done)   { <span class="count-pill done">{{ processStatus()!.done }} done</span> }
+                @if (processStatus()?.errors) { <span class="count-pill error">{{ processStatus()!.errors }} errors</span> }
+              </div>
+            }
+          </div>
+          <div class="file-actions">
+            <button class="btn btn-ghost" [disabled]="!apiOnline()" (click)="browseFiles()">+ Add Files</button>
+            <button class="btn btn-ghost" [disabled]="!apiOnline() || isProcessing() || files().length === 0"
+                    (click)="resetFiles()" title="Reset done/error files back to queued">↺ Reset</button>
+            <button class="btn btn-ghost btn-clear"
+                    [disabled]="!apiOnline() || isProcessing() || files().length === 0"
+                    (click)="clearFiles()">✕ Clear All</button>
+          </div>
+        </div>
+
+        @if (files().length === 0) {
+          <div class="empty-queue"><span class="empty-icon">📂</span><span>No files queued. Start the API and click Add Files.</span></div>
+        } @else {
+          @if (isProcessing()) {
+            <div class="progress-bar-wrap">
+              <div class="progress-bar-fill" [style.width.%]="progressValue() * 100"></div>
             </div>
           }
-        </div>
-        <div class="file-actions">
-          <button class="btn btn-ghost" [disabled]="!apiOnline()" (click)="browseFiles()">
-            + Add Files
-          </button>
-          <button class="btn btn-ghost" [disabled]="!apiOnline() || isProcessing() || files().length === 0"
-                  (click)="resetFiles()" title="Reset done/error files back to queued">
-            ↺ Reset
-          </button>
-          <button class="btn btn-ghost btn-clear"
-                  [disabled]="!apiOnline() || isProcessing() || files().length === 0"
-                  (click)="clearFiles()">
-            ✕ Clear All
-          </button>
-        </div>
-      </div>
-
-      @if (files().length === 0) {
-        <div class="empty-queue">
-          <span class="empty-icon">📂</span>
-          <span>No files queued. Start the API and click Add Files.</span>
-        </div>
-      } @else {
-        @if (isProcessing()) {
-          <div class="progress-bar-wrap">
-            <div class="progress-bar-fill" [style.width.%]="progressValue() * 100"></div>
+          <div class="file-list">
+            @for (file of files(); track file.input_path; let i = $index) {
+              <div class="file-row" [class]="'file-row--' + file.status">
+                <span class="file-status-icon" [style.color]="fileColor(file.status)"
+                      [class.spinning]="file.status === 'processing'">
+                  {{ fileIcon(file.status) }}
+                </span>
+                <div class="file-info">
+                  <span class="file-name">{{ basename(file.input_path) }}</span>
+                  @if (file.title) { <span class="file-title">→ "{{ file.title }}"</span> }
+                  @else if (file.status === 'done') { <span class="file-output">→ {{ basename(file.output_path) }}</span> }
+                  @else if (file.error) { <span class="file-error">{{ file.error }}</span> }
+                </div>
+                <span class="file-status-label" [style.color]="fileColor(file.status)">{{ file.status }}</span>
+                <button class="file-remove-btn" [disabled]="isProcessing()"
+                        (click)="removeFile(i, $event)" title="Remove">×</button>
+              </div>
+            }
           </div>
         }
+      </section>
 
-        <div class="file-list">
-          @for (file of files(); track file.input_path; let i = $index) {
-            <div class="file-row" [class]="'file-row--' + file.status">
-              <span class="file-status-icon"
-                    [style.color]="fileColor(file.status)"
-                    [class.spinning]="file.status === 'processing'">
-                {{ fileIcon(file.status) }}
-              </span>
-
-              <div class="file-info">
-                <span class="file-name">{{ basename(file.input_path) }}</span>
-                @if (file.title) {
-                  <span class="file-title">→ "{{ file.title }}"</span>
-                } @else if (file.status === 'done') {
-                  <span class="file-output">→ {{ basename(file.output_path) }}</span>
-                } @else if (file.error) {
-                  <span class="file-error">{{ file.error }}</span>
-                }
-              </div>
-
-              <span class="file-status-label" [style.color]="fileColor(file.status)">
-                {{ file.status }}
-              </span>
-
-              <button class="file-remove-btn"
-                      [disabled]="isProcessing()"
-                      (click)="removeFile(i, $event)"
-                      title="Remove">
-                ×
-              </button>
+      <!-- Settings -->
+      <section class="section">
+        <h2 class="section-title">Settings</h2>
+        <div class="settings-grid">
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">Animation Type</span>
+              <span class="setting-desc">Comic book effect style for onomatopoeia overlays</span>
             </div>
-          }
-        </div>
-      }
-    </section>
-
-    <!-- ── Settings ────────────────────────────────────────────────────── -->
-    <section class="section">
-      <h2 class="section-title">Settings</h2>
-
-      <div class="settings-grid">
-
-        <!-- Animation Type -->
-        <div class="setting-row">
-          <div class="setting-info">
-            <span class="setting-name">Animation Type</span>
-            <span class="setting-desc">Comic book effect style for onomatopoeia overlays</span>
+            <select class="setting-select" [ngModel]="settings().animation_type" (ngModelChange)="setAnimationType($event)">
+              @for (anim of animationTypes; track anim) { <option [value]="anim">{{ anim }}</option> }
+            </select>
           </div>
-          <select class="setting-select"
-                  [ngModel]="settings().animation_type"
-                  (ngModelChange)="setAnimationType($event)">
-            @for (anim of animationTypes; track anim) {
-              <option [value]="anim">{{ anim }}</option>
-            }
-          </select>
-        </div>
-
-        <!-- Sync Offset -->
-        <div class="setting-row">
-          <div class="setting-info">
-            <span class="setting-name">Sync Offset</span>
-            <span class="setting-desc">Shift onomatopoeia timing relative to audio events</span>
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">Sync Offset</span>
+              <span class="setting-desc">Shift onomatopoeia timing relative to audio events</span>
+            </div>
+            <div class="slider-group">
+              <input type="range" class="sync-slider" min="-0.5" max="0.5" step="0.05"
+                     [ngModel]="settings().sync_offset" (ngModelChange)="setSyncOffset($event)">
+              <span class="slider-value">{{ settings().sync_offset.toFixed(2) }}s</span>
+            </div>
           </div>
-          <div class="slider-group">
-            <input type="range" class="sync-slider"
-                   min="-0.5" max="0.5" step="0.05"
-                   [ngModel]="settings().sync_offset"
-                   (ngModelChange)="setSyncOffset($event)">
-            <span class="slider-value">{{ settings().sync_offset.toFixed(2) }}s</span>
-          </div>
-        </div>
-
-        <!-- AI Trimming -->
-        <div class="setting-row">
-          <div class="setting-info">
-            <span class="setting-name">AI Trimming</span>
-            <span class="setting-desc">Use Gemini to intelligently trim clips to the best moments</span>
-          </div>
-          <button class="toggle"
-                  [class.on]="settings().enable_trimming"
-                  (click)="toggleTrimming()">
-            <span class="toggle-knob"></span>
-          </button>
-        </div>
-
-        <!-- Output Directory -->
-        <div class="setting-row setting-row--full">
-          <div class="setting-info">
-            <span class="setting-name">Output Directory</span>
-            <span class="setting-desc">Where processed videos are saved</span>
-          </div>
-          <div class="dir-input-group">
-            <input class="dir-input"
-                   type="text"
-                   placeholder="/path/to/output"
-                   [ngModel]="settings().output_dir"
-                   (ngModelChange)="setOutputDir($event)">
-            <button class="btn btn-ghost" [disabled]="!apiOnline()" (click)="browseOutputDir()">
-              Browse
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">AI Trimming</span>
+              <span class="setting-desc">Use Gemini to intelligently trim clips to the best moments</span>
+            </div>
+            <button class="toggle" [class.on]="settings().enable_trimming" (click)="toggleTrimming()">
+              <span class="toggle-knob"></span>
             </button>
           </div>
+          <div class="setting-row setting-row--full">
+            <div class="setting-info">
+              <span class="setting-name">Output Directory</span>
+              <span class="setting-desc">Where processed videos and session logs are saved</span>
+            </div>
+            <div class="dir-input-group">
+              <input class="dir-input" type="text" placeholder="/path/to/output"
+                     [ngModel]="settings().output_dir" (ngModelChange)="setOutputDir($event)">
+              <button class="btn btn-ghost" [disabled]="!apiOnline()" (click)="browseOutputDir()">Browse</button>
+            </div>
+          </div>
         </div>
+      </section>
 
-      </div>
-    </section>
-
-    <!-- ── Controls ────────────────────────────────────────────────────── -->
-    <section class="section controls-section">
-      <div class="ctrl-row">
-        <button class="btn btn-save"
-                [disabled]="saving() || !apiOnline()"
-                (click)="saveSettings()">
-          @if (saving()) {
-            <span class="btn-spin"></span> Saving…
-          } @else if (saveDone()) {
-            ✓ Saved
-          } @else {
-            💾 Save Settings
+      <!-- Controls -->
+      <section class="section controls-section">
+        <div class="ctrl-row">
+          <button class="btn btn-save" [disabled]="saving() || !apiOnline()" (click)="saveSettings()">
+            @if (saving()) { <span class="btn-spin"></span> Saving… }
+            @else if (saveDone()) { ✓ Saved }
+            @else { 💾 Save Settings }
+          </button>
+          @if (!isProcessing()) {
+            <button class="btn btn-run" [disabled]="!apiOnline() || files().length === 0" (click)="startProcessing()">
+              ▶ Start Processing
+            </button>
           }
-        </button>
-
-        @if (!isProcessing()) {
-          <button class="btn btn-run"
-                  [disabled]="!apiOnline() || files().length === 0"
-                  (click)="startProcessing()">
-            ▶ Start Processing
-          </button>
-        }
-
-        @if (isProcessing()) {
-          <button class="btn btn-stop"
-                  [disabled]="isStopRequested()"
-                  (click)="stopProcessing()">
-            @if (isStopRequested()) {
-              <span class="btn-spin"></span> Stopping…
-            } @else {
-              ■ Stop After Current
-            }
-          </button>
-        }
-      </div>
-
-      @if (saveError()) {
-        <div class="error-msg">⚠ {{ saveError() }}</div>
-      }
-    </section>
-
-    <!-- ── Log Panel ───────────────────────────────────────────────────── -->
-    <section class="section log-section">
-      <div class="log-header">
-        <div class="log-header-left">
-          <h2 class="section-title" style="margin:0">stdout — SimpleAutoSubs API</h2>
           @if (isProcessing()) {
-            <span class="live-badge">● live</span>
+            <button class="btn btn-stop" [disabled]="isStopRequested()" (click)="stopProcessing()">
+              @if (isStopRequested()) { <span class="btn-spin"></span> Stopping… } @else { ■ Stop After Current }
+            </button>
           }
         </div>
-        <div class="log-header-right">
-          <button class="log-action-btn" (click)="poll()" title="Refresh">↻ Refresh</button>
-          <button class="log-action-btn log-action-btn--clear" (click)="clearLogs()">✕ Clear</button>
+        @if (saveError()) { <div class="error-msg">⚠ {{ saveError() }}</div> }
+      </section>
+
+      <!-- Live API log -->
+      <section class="section log-section">
+        <div class="log-header">
+          <div class="log-header-left">
+            <h2 class="section-title" style="margin:0">stdout — API</h2>
+            @if (isProcessing()) { <span class="live-badge">● live</span> }
+          </div>
+          <div class="log-header-right">
+            <button class="log-action-btn" (click)="poll()">↻</button>
+            <button class="log-action-btn log-action-btn--clear" (click)="clearLogs()">✕</button>
+          </div>
         </div>
+        <div class="log-body">
+          @for (line of logs(); track $index) {
+            <div class="log-line" [class.err]="isErr(line)" [class.ok]="isOk(line)" [class.warn]="isWarn(line)">{{ line }}</div>
+          }
+          @if (!logs().length) { <div class="log-empty">No output yet.</div> }
+        </div>
+      </section>
+
+    </div><!-- /left-panel -->
+
+    <!-- ── RIGHT: session log viewer ───────────────────────────────────── -->
+    <div class="right-panel">
+
+      <!-- Panel header -->
+      <div class="viewer-header">
+        @if (logViewState() === 'file') {
+          <button class="viewer-back-btn" (click)="backToLogList()">← Back</button>
+          <span class="viewer-title">{{ selectedLogFile()?.name ?? '' }}</span>
+        } @else {
+          <span class="viewer-title">Session Logs</span>
+          @if (settings().output_dir) {
+            <span class="viewer-dir">{{ settings().output_dir }}</span>
+          }
+          <button class="viewer-refresh-btn" [disabled]="!apiOnline()" (click)="refreshLogFiles()" title="Refresh">↻</button>
+        }
       </div>
 
-      <div class="log-body">
-        @for (line of logs(); track $index) {
-          <div class="log-line"
-               [class.err]="isErr(line)"
-               [class.ok]="isOk(line)"
-               [class.warn]="isWarn(line)">{{ line }}</div>
+      <!-- File list view -->
+      @if (logViewState() === 'list') {
+        @if (!settings().output_dir) {
+          <div class="viewer-empty">
+            <span class="viewer-empty-icon">📁</span>
+            <span>Set an output directory in Settings to see session logs here.</span>
+          </div>
+        } @else if (!apiOnline()) {
+          <div class="viewer-empty">
+            <span class="viewer-empty-icon">🔌</span>
+            <span>Start the API to browse logs.</span>
+          </div>
+        } @else if (logFiles().length === 0) {
+          <div class="viewer-empty">
+            <span class="viewer-empty-icon">🪵</span>
+            <span>No .txt log files found in the output directory yet.</span>
+          </div>
+        } @else {
+          <div class="log-file-list">
+            @for (file of logFiles(); track file.path) {
+              <button class="log-file-row" (click)="openLogFile(file)">
+                <span class="log-file-icon">📄</span>
+                <div class="log-file-info">
+                  <span class="log-file-name">{{ file.name }}</span>
+                  <span class="log-file-meta">{{ formatDate(file.modified) }} · {{ formatSize(file.size) }}</span>
+                </div>
+                <span class="log-file-arrow">›</span>
+              </button>
+            }
+          </div>
         }
-        @if (!logs().length) {
-          <div class="log-empty">No output yet — start the API and begin processing to see logs here.</div>
-        }
-      </div>
-    </section>
+      }
 
-  </div>
+      <!-- File content view -->
+      @if (logViewState() === 'file') {
+        @if (logFileLoading()) {
+          <div class="viewer-empty"><span class="viewer-empty-icon">⏳</span><span>Loading…</span></div>
+        } @else {
+          <div class="log-content-body">{{ selectedLogContent() }}</div>
+        }
+      }
+
+    </div><!-- /right-panel -->
+
+  </div><!-- /sub-panels -->
 </div>

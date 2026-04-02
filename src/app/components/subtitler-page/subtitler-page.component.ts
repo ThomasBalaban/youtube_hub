@@ -35,6 +35,13 @@ interface ServiceStatus {
   pid: number | null;
 }
 
+interface LogFile {
+  name: string;
+  path: string;
+  modified: number;
+  size: number;
+}
+
 const ANIMATION_TYPES = [
   'Auto', 'Drift & Fade', 'Wiggle', 'Pop & Shrink',
   'Shake', 'Pulse', 'Wave', 'Explode-Out', 'Hyper Bounce', 'Static',
@@ -48,12 +55,12 @@ const ANIMATION_TYPES = [
   styleUrl:    './subtitler-page.component.scss',
 })
 export class SubtitlerPageComponent extends PollingComponent {
-  protected override pollingInterval = 3000;
+  protected override pollingInterval = 5000;
 
   readonly animationTypes = ANIMATION_TYPES;
   readonly Math = Math;
 
-  // ── State ──────────────────────────────────────────────────────────────────
+  // ── Core state ─────────────────────────────────────────────────────────────
   files          = signal<FileEntry[]>([]);
   processStatus  = signal<ProcessStatus | null>(null);
   settings       = signal<SubtitlerSettings>({
@@ -72,6 +79,13 @@ export class SubtitlerPageComponent extends PollingComponent {
   saveError      = signal('');
   actionPending  = signal(false);
   settingsLoaded = signal(false);
+
+  // ── Log viewer state ───────────────────────────────────────────────────────
+  logViewState      = signal<'list' | 'file'>('list');
+  logFiles          = signal<LogFile[]>([]);
+  selectedLogFile   = signal<LogFile | null>(null);
+  selectedLogContent = signal<string>('');
+  logFileLoading    = signal(false);
 
   // ── Computed ───────────────────────────────────────────────────────────────
   isProcessing    = computed(() => this.processStatus()?.processing ?? false);
@@ -96,11 +110,10 @@ export class SubtitlerPageComponent extends PollingComponent {
     return map[s] ?? map['unknown'];
   });
 
-  // ── Settings setters (templates can't use arrow functions) ────────────────
+  // ── Settings setters ───────────────────────────────────────────────────────
   setAnimationType(v: string)   { this.settings.update(s => ({ ...s, animation_type: v })); }
   setSyncOffset(v: number)      { this.settings.update(s => ({ ...s, sync_offset: +v })); }
   setOutputDir(v: string)       { this.settings.update(s => ({ ...s, output_dir: v })); }
-  setEnableTrimming(v: boolean) { this.settings.update(s => ({ ...s, enable_trimming: v })); }
   toggleTrimming()              { this.settings.update(s => ({ ...s, enable_trimming: !s.enable_trimming })); }
 
   // ── Log helpers ────────────────────────────────────────────────────────────
@@ -112,23 +125,26 @@ export class SubtitlerPageComponent extends PollingComponent {
   fileIcon(status: string): string {
     return { queued: '○', processing: '◌', done: '✓', error: '✗' }[status] ?? '?';
   }
-
   fileColor(status: string): string {
-    return {
-      queued:     '#6b7280',
-      processing: '#3b82f6',
-      done:       '#34d399',
-      error:      '#ef4444',
-    }[status] ?? '#6b7280';
+    return { queued: '#6b7280', processing: '#3b82f6', done: '#34d399', error: '#ef4444' }[status] ?? '#6b7280';
   }
-
   basename(path: string): string {
     return path.split(/[\\/]/).pop() ?? path;
+  }
+  formatSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+  }
+  formatDate(ts: number): string {
+    return new Date(ts * 1000).toLocaleString('en-US', {
+      month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
   }
 
   // ── Polling ────────────────────────────────────────────────────────────────
   override async poll() {
-    // 1. Launcher status (always)
     try {
       const res = await fetch('/launcher/services');
       if (res.ok) {
@@ -146,41 +162,63 @@ export class SubtitlerPageComponent extends PollingComponent {
       this.apiOnline.set(false);
     }
 
-    // 2. API data — only when API is online
-    if (!this.apiOnline()) {
-      this.lastUpdated.set('Updated ' + new Date().toLocaleTimeString());
-      return;
-    }
+    if (this.apiOnline()) {
+      const [statusRes, filesRes, logsRes] = await Promise.allSettled([
+        fetch('/subtitler/process/status'),
+        fetch('/subtitler/files'),
+        fetch('/subtitler/logs?last=200'),
+      ]);
+      if (statusRes.status === 'fulfilled' && statusRes.value.ok)
+        this.processStatus.set(await statusRes.value.json());
+      if (filesRes.status === 'fulfilled' && filesRes.value.ok)
+        this.files.set(await filesRes.value.json());
+      if (logsRes.status === 'fulfilled' && logsRes.value.ok) {
+        const d = await logsRes.value.json();
+        this.logs.set(d.lines ?? []);
+      }
 
-    const [statusRes, filesRes, logsRes] = await Promise.allSettled([
-      fetch('/subtitler/process/status'),
-      fetch('/subtitler/files'),
-      fetch('/subtitler/logs?last=200'),
-    ]);
+      if (!this.settingsLoaded()) {
+        const r = await fetch('/subtitler/settings').catch(() => null);
+        if (r?.ok) { this.settings.set(await r.json()); this.settingsLoaded.set(true); }
+      }
 
-    if (statusRes.status === 'fulfilled' && statusRes.value.ok) {
-      this.processStatus.set(await statusRes.value.json());
-    }
-    if (filesRes.status === 'fulfilled' && filesRes.value.ok) {
-      this.files.set(await filesRes.value.json());
-    }
-    if (logsRes.status === 'fulfilled' && logsRes.value.ok) {
-      const data = await logsRes.value.json();
-      this.logs.set(data.lines ?? []);
-    }
-
-    // Load settings once
-    if (!this.settingsLoaded()) {
-      try {
-        const res = await fetch('/subtitler/settings');
-        if (res.ok) {
-          this.settings.set(await res.json());
-          this.settingsLoaded.set(true);
-        }
-      } catch { /* silent */ }
+      // Refresh log file list when in list view
+      if (this.logViewState() === 'list') await this.refreshLogFiles();
     }
 
     this.lastUpdated.set('Updated ' + new Date().toLocaleTimeString());
+  }
+
+  // ── Log viewer ─────────────────────────────────────────────────────────────
+  async refreshLogFiles() {
+    const dir = this.settings().output_dir;
+    if (!dir || !this.apiOnline()) { this.logFiles.set([]); return; }
+    const res = await fetch(`/subtitler/session-logs/list?dir=${encodeURIComponent(dir)}`).catch(() => null);
+    if (res?.ok) {
+      const d = await res.json();
+      this.logFiles.set(d.files ?? []);
+    }
+  }
+
+  async openLogFile(file: LogFile) {
+    this.logFileLoading.set(true);
+    this.selectedLogFile.set(file);
+    this.logViewState.set('file');
+    const res = await fetch(`/subtitler/session-logs/read?path=${encodeURIComponent(file.path)}`).catch(() => null);
+    if (res?.ok) {
+      const d = await res.json();
+      this.selectedLogContent.set(d.content ?? '');
+    } else {
+      this.selectedLogContent.set('Could not load file.');
+    }
+    this.logFileLoading.set(false);
+  }
+
+  backToLogList() {
+    this.logViewState.set('list');
+    this.selectedLogFile.set(null);
+    this.selectedLogContent.set('');
+    this.refreshLogFiles();
   }
 
   // ── File actions ───────────────────────────────────────────────────────────
@@ -191,14 +229,11 @@ export class SubtitlerPageComponent extends PollingComponent {
       const { paths } = await res.json();
       if (!paths?.length) return;
       await fetch('/subtitler/files', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ paths }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paths }),
       });
       await this._refreshFiles();
-    } catch (e) {
-      console.error('Browse failed:', e);
-    }
+    } catch (e) { console.error('Browse failed:', e); }
   }
 
   async removeFile(index: number, event: MouseEvent) {
@@ -228,7 +263,10 @@ export class SubtitlerPageComponent extends PollingComponent {
       const res = await fetch('/subtitler/settings/browse-dir');
       if (!res.ok) return;
       const { path } = await res.json();
-      if (path) this.settings.update(s => ({ ...s, output_dir: path }));
+      if (path) {
+        this.settings.update(s => ({ ...s, output_dir: path }));
+        await this.refreshLogFiles();
+      }
     } catch { /* silent */ }
   }
 
@@ -238,14 +276,14 @@ export class SubtitlerPageComponent extends PollingComponent {
     this.saveDone.set(false);
     try {
       const res = await fetch('/subtitler/settings', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(this.settings()),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.settings()),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       this.saveDone.set(true);
       setTimeout(() => this.saveDone.set(false), 2000);
-      await this._refreshFiles(); // output paths may have changed
+      await this._refreshFiles();
+      await this.refreshLogFiles();
     } catch (e: any) {
       this.saveError.set(e?.message ?? 'Save failed');
     } finally {
@@ -253,7 +291,7 @@ export class SubtitlerPageComponent extends PollingComponent {
     }
   }
 
-  // ── Service control (via launcher) ─────────────────────────────────────────
+  // ── Service & processing control ───────────────────────────────────────────
   async serviceAction(act: 'start' | 'stop' | 'restart') {
     if (this.actionPending()) return;
     this.actionPending.set(true);
@@ -261,12 +299,9 @@ export class SubtitlerPageComponent extends PollingComponent {
       await fetch(`/launcher/services/simple_auto_subs_api/${act}`, { method: 'POST' });
       await this.poll();
       if (act !== 'stop') setTimeout(() => this.poll(), 3000);
-    } finally {
-      this.actionPending.set(false);
-    }
+    } finally { this.actionPending.set(false); }
   }
 
-  // ── Processing control (via subtitler API) ─────────────────────────────────
   async startProcessing() {
     await fetch('/subtitler/process/start', { method: 'POST' }).catch(() => {});
     await this.poll();
@@ -277,7 +312,6 @@ export class SubtitlerPageComponent extends PollingComponent {
     await this.poll();
   }
 
-  // ── Logs ───────────────────────────────────────────────────────────────────
   async clearLogs() {
     await fetch('/subtitler/logs', { method: 'DELETE' }).catch(() => {});
     this.logs.set([]);
