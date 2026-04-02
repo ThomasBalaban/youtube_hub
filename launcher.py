@@ -268,6 +268,9 @@ app.add_middleware(
 from publisher_routes import router as publisher_router
 app.include_router(publisher_router, prefix="/launcher")
 
+from subtitler_routes import router as subtitler_router
+app.include_router(subtitler_router, prefix="/launcher")
+
 # ─────────────────────────────────────────────
 # Routes
 # ─────────────────────────────────────────────

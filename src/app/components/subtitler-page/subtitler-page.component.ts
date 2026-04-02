@@ -162,6 +162,12 @@ export class SubtitlerPageComponent extends PollingComponent {
       this.apiOnline.set(false);
     }
 
+    // Settings load via launcher — always available, no API needed
+    if (!this.settingsLoaded()) {
+      const r = await fetch('/launcher/subtitler-settings/settings').catch(() => null);
+      if (r?.ok) { this.settings.set(await r.json()); this.settingsLoaded.set(true); }
+    }
+
     if (this.apiOnline()) {
       const [statusRes, filesRes, logsRes] = await Promise.allSettled([
         fetch('/subtitler/process/status'),
@@ -175,11 +181,6 @@ export class SubtitlerPageComponent extends PollingComponent {
       if (logsRes.status === 'fulfilled' && logsRes.value.ok) {
         const d = await logsRes.value.json();
         this.logs.set(d.lines ?? []);
-      }
-
-      if (!this.settingsLoaded()) {
-        const r = await fetch('/subtitler/settings').catch(() => null);
-        if (r?.ok) { this.settings.set(await r.json()); this.settingsLoaded.set(true); }
       }
 
       // Refresh log file list when in list view
@@ -275,11 +276,21 @@ export class SubtitlerPageComponent extends PollingComponent {
     this.saveError.set('');
     this.saveDone.set(false);
     try {
-      const res = await fetch('/subtitler/settings', {
+      // Always persist via launcher (no API required)
+      const res = await fetch('/launcher/subtitler-settings/settings', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(this.settings()),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      // Also sync to running API instance if online
+      if (this.apiOnline()) {
+        await fetch('/subtitler/settings', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.settings()),
+        }).catch(() => {});
+      }
+
       this.saveDone.set(true);
       setTimeout(() => this.saveDone.set(false), 2000);
       await this._refreshFiles();
