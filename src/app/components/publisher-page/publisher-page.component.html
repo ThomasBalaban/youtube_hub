@@ -1,219 +1,323 @@
 <div class="pub-page">
 
-  <!-- ── Header ─────────────────────────────────────────────────────────── -->
+  <!-- ── Header ──────────────────────────────────────────────────────────── -->
   <div class="pub-header">
     <div class="pub-header-left">
-      <a routerLink="/" class="back-btn" title="Back to Hub">
-        <span class="back-arrow">←</span>
-        <span>Hub</span>
+      <a routerLink="/" class="back-btn">
+        <span>←</span><span>Hub</span>
       </a>
       <div class="title-block">
-        <h1 class="pub-title">
-          <span class="yt-icon">▶</span> YouTube Shorts Publisher
-        </h1>
+        <h1 class="pub-title"><span class="yt-icon">▶</span> YouTube Shorts Publisher</h1>
         <span class="sub-label">Configure run mode &amp; launch</span>
       </div>
     </div>
-
     <div class="pub-header-right">
-      <!-- Service Status Pill -->
-      <div class="status-strip"
-           [style.--sc]="statusMeta().color">
-        @if (isStarting() || isStopping()) {
-          <span class="strip-spinner"></span>
-        } @else {
-          <span class="strip-dot">{{ statusMeta().icon }}</span>
-        }
-        <span class="strip-label">{{ statusMeta().label }}</span>
+      <div class="status-strip" [style.--sc]="statusMeta().color">
+        @if (isStarting() || isStopping()) { <span class="strip-spinner"></span> }
+        @else { <span>{{ statusMeta().icon }}</span> }
+        <span>{{ statusMeta().label }}</span>
         @if (serviceStatus()?.pid) {
           <span class="strip-pid">PID {{ serviceStatus()!.pid }}</span>
         }
       </div>
-
       <span class="last-upd">{{ lastUpdated() }}</span>
     </div>
   </div>
 
-  <!-- ── Launcher offline banner ─────────────────────────────────────────── -->
   @if (!launcherOnline()) {
-    <div class="banner-warn">
-      ⚠ Launcher offline — start it with <code>npm start</code>
+    <div class="banner-warn">⚠ Launcher offline — start it with <code>npm start</code></div>
+  }
+
+  <!-- ── Two-panel body ──────────────────────────────────────────────────── -->
+  <div class="pub-panels">
+
+    <!-- LEFT: controls ───────────────────────────────────────────────────── -->
+    <div class="left-panel">
+
+      <section class="section">
+        <h2 class="section-title">Run Mode</h2>
+        <div class="mode-grid">
+          @for (m of modes; track m) {
+            <button class="mode-card" [class.active]="selectedMode() === m"
+                    [style.--mc]="MODE_META[m].color" (click)="selectMode(m)">
+              <span class="mode-icon">{{ MODE_META[m].icon }}</span>
+              <span class="mode-label">{{ MODE_META[m].label }}</span>
+              <span class="mode-desc">{{ MODE_META[m].desc }}</span>
+              <span class="mode-check">✓</span>
+            </button>
+          }
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">Options</h2>
+        <div class="options-list">
+          @if (showVideoCount()) {
+            <div class="option-row">
+              <div class="option-info">
+                <span class="option-name">Videos to Process</span>
+                <span class="option-desc">How many drafts to schedule in a single run</span>
+              </div>
+              <div class="count-control">
+                <button class="count-btn" (click)="videoCount.set(Math.max(1, videoCount() - 1))">−</button>
+                <input class="count-input" type="number" min="1" max="500"
+                       [ngModel]="videoCount()" (ngModelChange)="videoCount.set($event)">
+                <button class="count-btn" (click)="videoCount.set(Math.min(500, videoCount() + 1))">+</button>
+              </div>
+            </div>
+          }
+          @if (showTestMode()) {
+            <div class="option-row">
+              <div class="option-info">
+                <span class="option-name">Test Mode</span>
+                <span class="option-desc">Fill metadata but <strong>skip final Save/Publish</strong></span>
+              </div>
+              <button class="toggle" [class.on]="testMode()" (click)="testMode.set(!testMode())">
+                <span class="toggle-knob"></span>
+              </button>
+            </div>
+          }
+          @if (!showVideoCount() && !showTestMode()) {
+            <div class="no-options">No additional options for this mode.</div>
+          }
+        </div>
+      </section>
+
+      <section class="section controls-section">
+        <div class="ctrl-row">
+          <button class="btn btn-save" [disabled]="saving() || !launcherOnline()" (click)="saveSettings()">
+            @if (saving()) { <span class="btn-spin"></span>Saving… }
+            @else if (saveDone()) { ✓ Saved }
+            @else { 💾 Save }
+          </button>
+          <button class="btn btn-run"
+                  [disabled]="saving() || actionPending() || !launcherOnline() || isRunning() || isStarting()"
+                  (click)="saveAndRun()">
+            @if (actionPending() && !isRunning()) { <span class="btn-spin"></span>Starting… }
+            @else { ▶ Save &amp; Run }
+          </button>
+          @if (isRunning() || isStarting()) {
+            <button class="btn btn-stop" [disabled]="actionPending() || isStopping() || !launcherOnline()"
+                    (click)="serviceAction('stop')">
+              @if (isStopping()) { <span class="btn-spin"></span>Stopping… } @else { ■ Stop }
+            </button>
+          }
+          @if (isRunning()) {
+            <button class="btn btn-restart" [disabled]="actionPending() || !launcherOnline()"
+                    (click)="serviceAction('restart')">↺ Restart</button>
+          }
+        </div>
+        @if (saveError()) { <div class="error-msg">⚠ {{ saveError() }}</div> }
+      </section>
+
+      <section class="section log-section">
+        <div class="log-header">
+          <div class="log-header-left">
+            <h2 class="section-title" style="margin:0">stdout</h2>
+            @if (isRunning()) { <span class="live-badge">● live</span> }
+          </div>
+          <div class="log-header-right">
+            <button class="log-btn" (click)="refreshLogs()">↻</button>
+            <button class="log-btn log-btn--clear" (click)="clearLogs()">✕</button>
+          </div>
+        </div>
+        <div class="log-body">
+          @for (line of logs(); track $index) {
+            <div class="log-line" [class.err]="isErr(line)" [class.ok]="isOk(line)" [class.warn]="isWarn(line)">
+              {{ line }}
+            </div>
+          }
+          @if (!logs().length) {
+            <div class="log-empty">No output yet.</div>
+          }
+        </div>
+      </section>
+
+    </div>
+
+    <!-- RIGHT: data file viewer ──────────────────────────────────────────── -->
+    <div class="right-panel">
+
+      <div class="viewer-header">
+        @if (dataViewState() === 'file') {
+          <button class="viewer-back-btn" (click)="backToDataList()">← Back</button>
+          <div class="viewer-title-group">
+            <span class="viewer-title">{{ selectedFile()?.label }}</span>
+            <span class="viewer-path">{{ selectedFile()?.path }}</span>
+          </div>
+          <button class="btn-erase" (click)="openClearModal()" title="Delete this file">
+            🗑 Erase
+          </button>
+        } @else {
+          <span class="viewer-title">Output Files</span>
+          <button class="viewer-refresh-btn" [disabled]="!launcherOnline()" (click)="refreshDataFiles()">
+            ↻ Refresh
+          </button>
+        }
+      </div>
+
+      <!-- File list ─────────────────────────────────────────────────────── -->
+      @if (dataViewState() === 'list') {
+        <div class="data-file-list">
+          @for (file of dataFiles(); track file.key) {
+            <button class="data-file-row" [class.missing]="!file.exists"
+                    [disabled]="!file.exists" (click)="openDataFile(file)">
+              <span class="data-file-icon">{{ file.exists ? '📄' : '○' }}</span>
+              <div class="data-file-info">
+                <span class="data-file-label">{{ file.label }}</span>
+                <span class="data-file-desc">{{ file.description }}</span>
+                @if (file.exists) {
+                  <span class="data-file-meta">{{ formatSize(file.size) }} · {{ formatDate(file.modified) }}</span>
+                } @else {
+                  <span class="data-file-missing">Not yet generated</span>
+                }
+              </div>
+              @if (file.exists) { <span class="data-file-arrow">›</span> }
+            </button>
+          }
+          @if (!dataFiles().length) {
+            <div class="viewer-empty"><span>—</span><span>Start the launcher to check file status.</span></div>
+          }
+        </div>
+      }
+
+      <!-- File content ──────────────────────────────────────────────────── -->
+      @if (dataViewState() === 'file') {
+        @if (dataLoading()) {
+          <div class="viewer-empty"><span>⏳</span><span>Loading…</span></div>
+        } @else if (!selectedContent()) {
+          <div class="viewer-empty"><span>⚠</span><span>Could not load file.</span></div>
+        } @else {
+
+          <!-- draft_analysis ─────────────────────────────────────────────── -->
+          @if (selectedFile()?.key === 'draft_analysis') {
+            <div class="content-scroll">
+              @for (item of asDraftAnalysis(); track $index) {
+                <div class="analysis-card">
+
+                  <div class="analysis-header">
+                    <div class="analysis-titles">
+                      <span class="analysis-new-title">{{ item.new_title }}</span>
+                      <span class="analysis-orig-title">{{ item.title }}</span>
+                    </div>
+                    <div class="virality-badge"
+                         [style.color]="viralityColor(item.virality)"
+                         [style.border-color]="viralityColor(item.virality) + '55'"
+                         [style.background]="viralityColor(item.virality) + '18'">
+                      {{ item.virality }}<span class="virality-denom">/10</span>
+                    </div>
+                  </div>
+
+                  <div class="analysis-pills">
+                    @if (item.game_name && item.game_name !== 'Unknown') {
+                      <span class="pill pill-game">🎮 {{ item.game_name }}</span>
+                    }
+                    @if (item.is_fnaf_game) {
+                      <span class="pill pill-fnaf">🐻 FNAF</span>
+                    }
+                    @for (tag of item.hashtags; track tag) {
+                      <span class="pill pill-tag">{{ tag }}</span>
+                    }
+                  </div>
+
+                  <p class="analysis-reasoning">{{ item.virality_reasoning }}</p>
+
+                  <div class="analysis-caption">
+                    <span class="caption-label">Caption</span>
+                    <span class="caption-text">{{ item.youtube_description }}</span>
+                  </div>
+
+                </div>
+              }
+              <div class="content-footer">{{ asDraftAnalysis().length }} entries</div>
+            </div>
+          }
+
+          <!-- failed_shorts ──────────────────────────────────────────────── -->
+          @else if (selectedFile()?.key === 'failed_shorts') {
+            <div class="content-scroll">
+              @for (item of asFailedShorts(); track $index) {
+                <div class="failed-card">
+                  <div class="failed-header">
+                    <span class="failed-title">{{ item.title }}</span>
+                    <span class="failed-ts">{{ item.timestamp }}</span>
+                  </div>
+                  <pre class="failed-error">{{ item.error }}</pre>
+                </div>
+              }
+              <div class="content-footer">{{ asFailedShorts().length }} entries</div>
+            </div>
+          }
+
+          <!-- backtrack_videos ───────────────────────────────────────────── -->
+          @else if (selectedFile()?.key === 'backtrack_videos') {
+            <div class="content-scroll">
+              @for (item of asBacktrack(); track $index) {
+                <div class="simple-row">
+                  <span class="simple-title">{{ item.title }}</span>
+                  <div class="simple-badges">
+                    @if (item.current_status) {
+                      <span class="pill pill-status">{{ item.current_status }}</span>
+                    }
+                    @if (item.has_backtrack) {
+                      <span class="pill pill-backtrack">Backtrack</span>
+                    }
+                  </div>
+                </div>
+              }
+              <div class="content-footer">{{ asBacktrack().length }} entries</div>
+            </div>
+          }
+
+          <!-- draft_videos ───────────────────────────────────────────────── -->
+          @else if (selectedFile()?.key === 'draft_videos') {
+            <div class="content-scroll">
+              @for (item of asDraftVideos(); track $index) {
+                <div class="simple-row">
+                  <span class="simple-title">{{ item.title }}</span>
+                  @if (item.has_backtrack) {
+                    <span class="pill pill-backtrack">Backtrack</span>
+                  }
+                </div>
+              }
+              <div class="content-footer">{{ asDraftVideos().length }} entries</div>
+            </div>
+          }
+
+          <!-- scheduled_videos (schema TBD) ─────────────────────────────── -->
+          @else {
+            <div class="content-scroll">
+              <pre class="raw-json">{{ selectedContent() | json }}</pre>
+            </div>
+          }
+
+        }
+      }
+
+    </div><!-- /right-panel -->
+  </div><!-- /pub-panels -->
+
+  <!-- ── Clear confirmation modal ─────────────────────────────────────────── -->
+  @if (showClearModal()) {
+    <div class="modal-overlay" (click)="cancelClear()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-icon">🗑</div>
+        <h3 class="modal-title">Erase file?</h3>
+        <p class="modal-body">
+          Are you sure you want to permanently delete
+          <strong>{{ selectedFile()?.label }}</strong>?<br>
+          This cannot be undone.
+        </p>
+        <div class="modal-actions">
+          <button class="modal-btn modal-btn-cancel" [disabled]="clearing()" (click)="cancelClear()">
+            Cancel
+          </button>
+          <button class="modal-btn modal-btn-confirm" [disabled]="clearing()" (click)="confirmClear()">
+            @if (clearing()) { <span class="btn-spin"></span>Deleting… } @else { Delete }
+          </button>
+        </div>
+      </div>
     </div>
   }
 
-  <!-- ── Body ───────────────────────────────────────────────────────────── -->
-  <div class="pub-body">
-
-    <!-- ── Mode Selection ─────────────────────────────────────────────── -->
-    <section class="section">
-      <h2 class="section-title">Run Mode</h2>
-      <p class="section-hint">Pick what the publisher should do when it starts.</p>
-
-      <div class="mode-grid">
-        @for (m of modes; track m) {
-          <button
-            class="mode-card"
-            [class.active]="selectedMode() === m"
-            [style.--mc]="MODE_META[m].color"
-            (click)="selectMode(m)">
-            <span class="mode-icon">{{ MODE_META[m].icon }}</span>
-            <span class="mode-label">{{ MODE_META[m].label }}</span>
-            <span class="mode-desc">{{ MODE_META[m].desc }}</span>
-            <span class="mode-check">✓</span>
-          </button>
-        }
-      </div>
-    </section>
-
-    <!-- ── Additional Settings ────────────────────────────────────────── -->
-    <section class="section">
-      <h2 class="section-title">Options</h2>
-
-      <div class="options-list">
-
-        <!-- Video Count — only for batch -->
-        @if (showVideoCount()) {
-          <div class="option-row" [class.dim]="!showVideoCount()">
-            <div class="option-info">
-              <span class="option-name">Videos to Process</span>
-              <span class="option-desc">How many drafts to schedule in a single run</span>
-            </div>
-            <div class="count-control">
-              <button class="count-btn" (click)="videoCount.set(Math.max(1, videoCount() - 1))">−</button>
-              <input
-                class="count-input"
-                type="number"
-                min="1"
-                max="500"
-                [ngModel]="videoCount()"
-                (ngModelChange)="videoCount.set($event)"
-              />
-              <button class="count-btn" (click)="videoCount.set(Math.min(500, videoCount() + 1))">+</button>
-            </div>
-          </div>
-        }
-
-        <!-- Test Mode — only for publisher modes -->
-        @if (showTestMode()) {
-          <div class="option-row">
-            <div class="option-info">
-              <span class="option-name">Test Mode</span>
-              <span class="option-desc">
-                Fill in metadata &amp; previews, but <strong>skip the final Save/Publish</strong> click
-              </span>
-            </div>
-            <button
-              class="toggle"
-              [class.on]="testMode()"
-              (click)="testMode.set(!testMode())"
-              [attr.aria-pressed]="testMode()">
-              <span class="toggle-knob"></span>
-            </button>
-          </div>
-        }
-
-        <!-- Placeholder when no extra options -->
-        @if (!showVideoCount() && !showTestMode()) {
-          <div class="no-options">No additional options for this mode.</div>
-        }
-
-      </div>
-    </section>
-
-    <!-- ── Controls ───────────────────────────────────────────────────── -->
-    <section class="section controls-section">
-
-      <div class="ctrl-row">
-        <!-- Save -->
-        <button
-          class="btn btn-save"
-          [disabled]="saving() || !launcherOnline()"
-          (click)="saveSettings()">
-          @if (saving()) {
-            <span class="btn-spin"></span> Saving…
-          } @else if (saveDone()) {
-            ✓ Saved
-          } @else {
-            💾 Save Settings
-          }
-        </button>
-
-        <!-- Save & Run -->
-        <button
-          class="btn btn-run"
-          [disabled]="saving() || actionPending() || !launcherOnline() || isRunning() || isStarting()"
-          (click)="saveAndRun()">
-          @if (actionPending() && !isRunning()) {
-            <span class="btn-spin"></span> Starting…
-          } @else {
-            ▶ Save &amp; Run
-          }
-        </button>
-
-        <!-- Stop -->
-        @if (isRunning() || isStarting()) {
-          <button
-            class="btn btn-stop"
-            [disabled]="actionPending() || isStopping() || !launcherOnline()"
-            (click)="serviceAction('stop')">
-            @if (isStopping()) {
-              <span class="btn-spin"></span> Stopping…
-            } @else {
-              ■ Stop
-            }
-          </button>
-        }
-
-        <!-- Restart -->
-        @if (isRunning()) {
-          <button
-            class="btn btn-restart"
-            [disabled]="actionPending() || !launcherOnline()"
-            (click)="serviceAction('restart')">
-            ↺ Restart
-          </button>
-        }
-      </div>
-
-      @if (saveError()) {
-        <div class="error-msg">⚠ {{ saveError() }}</div>
-      }
-
-    </section>
-
-    <!-- ── Log Panel ───────────────────────────────────────────────────── -->
-    <section class="section log-section">
-      <div class="log-header">
-        <div class="log-header-left">
-          <h2 class="section-title" style="margin:0">stdout — Publisher</h2>
-          @if (isRunning()) {
-            <span class="live-badge">● live</span>
-          }
-        </div>
-        <div class="log-header-right">
-          <button class="log-action-btn" (click)="refreshLogs()" title="Refresh logs">
-            ↻ Refresh
-          </button>
-          <button class="log-action-btn log-action-btn--clear" (click)="clearLogs()" title="Clear logs">
-            ✕ Clear
-          </button>
-        </div>
-      </div>
-
-      <div class="log-body">
-        @for (line of logs(); track $index) {
-          <div class="log-line"
-               [class.err]="isErr(line)"
-               [class.ok]="isOk(line)"
-               [class.warn]="isWarn(line)">{{ line }}</div>
-        }
-        @if (!logs().length) {
-          <div class="log-empty">
-            No output yet — start the publisher to see logs here.
-          </div>
-        }
-      </div>
-    </section>
-
-  </div><!-- /pub-body -->
 </div>

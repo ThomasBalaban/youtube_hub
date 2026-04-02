@@ -20,31 +20,55 @@ interface ServiceStatus {
   pid: number | null;
 }
 
+interface DataFileMeta {
+  key: string;
+  label: string;
+  description: string;
+  path: string;
+  exists: boolean;
+  size: number;
+  modified: number | null;
+}
+
+// ── Exact JSON schemas from youtube_shorts_publisher ──────────────────────────
+
+interface DraftAnalysisEntry {
+  description: string;
+  virality: number;
+  virality_reasoning: string;
+  game_name: string;
+  is_fnaf_game: boolean;
+  new_title: string;
+  youtube_description: string;
+  hashtags: string[];
+  tags: string;
+  title: string;        // original title
+}
+
+interface FailedShortsEntry {
+  title: string;
+  error: string;        // multiline — use white-space: pre-wrap
+  timestamp: string;
+}
+
+interface DraftVideoEntry {
+  title: string;
+  has_backtrack: boolean;
+}
+
+interface BacktrackVideoEntry {
+  title: string;
+  has_backtrack: boolean;
+  current_status: string;   // e.g. "Draft"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const MODE_META: Record<RunMode, { label: string; icon: string; desc: string; color: string }> = {
-  analysis: {
-    label: 'AI Analysis',
-    icon: '🤖',
-    desc: 'Download drafts & analyze with Gemini',
-    color: '#a78bfa',
-  },
-  scraping: {
-    label: 'Scraper',
-    icon: '🕷',
-    desc: 'Scan & export draft/scheduled data to JSON',
-    color: '#fbbf24',
-  },
-  publisher_single: {
-    label: 'Publish One',
-    icon: '▶',
-    desc: 'Process a single draft from analysis results',
-    color: '#4ade80',
-  },
-  publisher_batch: {
-    label: 'Publish Batch',
-    icon: '⚡',
-    desc: 'Process multiple drafts up to the set limit',
-    color: '#f87171',
-  },
+  analysis:         { label: 'AI Analysis',  icon: '🤖', desc: 'Download drafts & analyze with Gemini',        color: '#a78bfa' },
+  scraping:         { label: 'Scraper',       icon: '🕷',  desc: 'Scan & export draft/scheduled data to JSON',  color: '#fbbf24' },
+  publisher_single: { label: 'Publish One',   icon: '▶',  desc: 'Process a single draft from analysis results', color: '#4ade80' },
+  publisher_batch:  { label: 'Publish Batch', icon: '⚡', desc: 'Process multiple drafts up to the set limit',  color: '#f87171' },
 };
 
 function settingsToMode(s: PublisherSettings): RunMode {
@@ -54,10 +78,7 @@ function settingsToMode(s: PublisherSettings): RunMode {
   return 'publisher_batch';
 }
 
-function modeToFlags(mode: RunMode): Pick<
-  PublisherSettings,
-  'ENABLE_ANALYSIS_MODE' | 'ENABLE_SCRAPING_MODE' | 'PROCESS_SINGLE_VIDEO'
-> {
+function modeToFlags(mode: RunMode) {
   return {
     ENABLE_ANALYSIS_MODE: mode === 'analysis',
     ENABLE_SCRAPING_MODE: mode === 'scraping',
@@ -70,7 +91,7 @@ function modeToFlags(mode: RunMode): Pick<
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './publisher-page.component.html',
-  styleUrl: './publisher-page.component.scss',
+  styleUrl:    './publisher-page.component.scss',
 })
 export class PublisherPageComponent extends PollingComponent {
   protected override pollingInterval = 4000;
@@ -79,7 +100,7 @@ export class PublisherPageComponent extends PollingComponent {
   readonly modes: RunMode[] = ['analysis', 'scraping', 'publisher_single', 'publisher_batch'];
   readonly Math = Math;
 
-  // ── State ──────────────────────────────────────────────────────────────────
+  // ── Publisher controls ────────────────────────────────────────────────────
   selectedMode   = signal<RunMode>('publisher_batch');
   videoCount     = signal(50);
   testMode       = signal(false);
@@ -92,12 +113,20 @@ export class PublisherPageComponent extends PollingComponent {
   loading        = signal(false);
   lastUpdated    = signal('—');
   settingsLoaded = signal(false);
+  logs           = signal<string[]>([]);
 
-  // ── Log state ──────────────────────────────────────────────────────────────
-  logs        = signal<string[]>([]);
-  logsLoading = signal(false);
+  // ── Data viewer ───────────────────────────────────────────────────────────
+  dataFiles       = signal<DataFileMeta[]>([]);
+  dataViewState   = signal<'list' | 'file'>('list');
+  selectedFile    = signal<DataFileMeta | null>(null);
+  selectedContent = signal<any>(null);
+  dataLoading     = signal(false);
 
-  // ── Computed ───────────────────────────────────────────────────────────────
+  // ── Clear modal ───────────────────────────────────────────────────────────
+  showClearModal = signal(false);
+  clearing       = signal(false);
+
+  // ── Computed ──────────────────────────────────────────────────────────────
   isRunning  = computed(() => this.serviceStatus()?.status === 'online');
   isStarting = computed(() => this.serviceStatus()?.status === 'starting');
   isStopping = computed(() => this.serviceStatus()?.status === 'stopping');
@@ -119,12 +148,37 @@ export class PublisherPageComponent extends PollingComponent {
     return map[s] ?? map['unknown'];
   });
 
-  // ── Log helpers ────────────────────────────────────────────────────────────
+  // ── Typed content casts ───────────────────────────────────────────────────
+  asDraftAnalysis(): DraftAnalysisEntry[]   { return Array.isArray(this.selectedContent()) ? this.selectedContent() : []; }
+  asFailedShorts():  FailedShortsEntry[]    { return Array.isArray(this.selectedContent()) ? this.selectedContent() : []; }
+  asDraftVideos():   DraftVideoEntry[]      { return Array.isArray(this.selectedContent()) ? this.selectedContent() : []; }
+  asBacktrack():     BacktrackVideoEntry[]  { return Array.isArray(this.selectedContent()) ? this.selectedContent() : []; }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  viralityColor(score: number): string {
+    if (score >= 8) return '#34d399';
+    if (score >= 6) return '#fbbf24';
+    return '#f87171';
+  }
+
+  formatSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+  }
+
+  formatDate(ts: number | null): string {
+    if (!ts) return '—';
+    return new Date(ts * 1000).toLocaleString('en-US', {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+  }
+
   isErr  = (l: string) => /error|failed|exception|traceback|fatal/i.test(l);
   isOk   = (l: string) => /✅|healthy|ready|started|running/i.test(l);
   isWarn = (l: string) => /warn|warning|⚠/i.test(l);
 
-  // ── Init / Polling ─────────────────────────────────────────────────────────
+  // ── Polling ───────────────────────────────────────────────────────────────
   override async poll() {
     this.loading.set(true);
     try {
@@ -136,18 +190,17 @@ export class PublisherPageComponent extends PollingComponent {
       if (svcRes.ok) {
         this.launcherOnline.set(true);
         const svcs: ServiceStatus[] = await svcRes.json();
-        const pub = svcs.find(s => s.id === 'youtube_publisher') ?? null;
-        this.serviceStatus.set(pub);
+        this.serviceStatus.set(svcs.find(s => s.id === 'youtube_publisher') ?? null);
         this.lastUpdated.set('Updated ' + new Date().toLocaleTimeString());
       } else {
         this.launcherOnline.set(false);
       }
 
-      if (settingsRes && settingsRes.ok) {
-        const settings: PublisherSettings = await settingsRes.json();
-        this.selectedMode.set(settingsToMode(settings));
-        this.videoCount.set(settings.VIDEOS_TO_PROCESS_COUNT);
-        this.testMode.set(settings.TEST_MODE);
+      if (settingsRes?.ok) {
+        const s: PublisherSettings = await settingsRes.json();
+        this.selectedMode.set(settingsToMode(s));
+        this.videoCount.set(s.VIDEOS_TO_PROCESS_COUNT);
+        this.testMode.set(s.TEST_MODE);
         this.settingsLoaded.set(true);
       }
     } catch {
@@ -157,48 +210,71 @@ export class PublisherPageComponent extends PollingComponent {
       this.loading.set(false);
     }
 
-    // Always refresh logs on each poll tick
     await this.refreshLogs();
+    if (this.dataViewState() === 'list') await this.refreshDataFiles();
   }
 
-  // ── Log actions ────────────────────────────────────────────────────────────
-  async refreshLogs() {
-    if (!this.launcherOnline()) return;
+  // ── Data viewer ───────────────────────────────────────────────────────────
+  async refreshDataFiles() {
+    const res = await fetch('/launcher/publisher/data/files').catch(() => null);
+    if (res?.ok) this.dataFiles.set(await res.json());
+  }
+
+  async openDataFile(file: DataFileMeta) {
+    if (!file.exists) return;
+    this.selectedFile.set(file);
+    this.dataViewState.set('file');
+    this.dataLoading.set(true);
+    this.selectedContent.set(null);
+    const res = await fetch(`/launcher/publisher/data/file?key=${file.key}`).catch(() => null);
+    if (res?.ok) {
+      const d = await res.json();
+      this.selectedContent.set(d.data);
+    }
+    this.dataLoading.set(false);
+  }
+
+  backToDataList() {
+    this.dataViewState.set('list');
+    this.selectedFile.set(null);
+    this.selectedContent.set(null);
+    this.refreshDataFiles();
+  }
+
+  // ── Clear modal ───────────────────────────────────────────────────────────
+  openClearModal() { this.showClearModal.set(true); }
+  cancelClear()    { this.showClearModal.set(false); }
+
+  async confirmClear() {
+    const key = this.selectedFile()?.key;
+    if (!key) return;
+    this.clearing.set(true);
     try {
-      const res = await fetch('/launcher/services/youtube_publisher/logs?last=200');
-      if (!res.ok) return;
-      const data = await res.json();
-      this.logs.set(data.lines ?? []);
-    } catch { /* silent */ }
+      const res = await fetch(`/launcher/publisher/data/file?key=${key}`, { method: 'DELETE' });
+      if (res.ok) {
+        this.showClearModal.set(false);
+        this.backToDataList();
+      }
+    } finally {
+      this.clearing.set(false);
+    }
   }
 
-  async clearLogs() {
-    try {
-      await fetch('/launcher/services/youtube_publisher/logs', { method: 'DELETE' });
-      this.logs.set([]);
-    } catch { /* silent */ }
-  }
-
-  // ── Actions ────────────────────────────────────────────────────────────────
-  selectMode(mode: RunMode) {
-    this.selectedMode.set(mode);
-  }
+  // ── Publisher controls ────────────────────────────────────────────────────
+  selectMode(mode: RunMode) { this.selectedMode.set(mode); }
 
   async saveSettings() {
     this.saving.set(true);
     this.saveError.set('');
     this.saveDone.set(false);
-
     const payload: PublisherSettings = {
       ...modeToFlags(this.selectedMode()),
       VIDEOS_TO_PROCESS_COUNT: this.videoCount(),
       TEST_MODE: this.testMode(),
     };
-
     try {
       const res = await fetch('/launcher/publisher/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -227,5 +303,16 @@ export class PublisherPageComponent extends PollingComponent {
     } finally {
       this.actionPending.set(false);
     }
+  }
+
+  async refreshLogs() {
+    if (!this.launcherOnline()) return;
+    const res = await fetch('/launcher/services/youtube_publisher/logs?last=200').catch(() => null);
+    if (res?.ok) { const d = await res.json(); this.logs.set(d.lines ?? []); }
+  }
+
+  async clearLogs() {
+    await fetch('/launcher/services/youtube_publisher/logs', { method: 'DELETE' }).catch(() => {});
+    this.logs.set([]);
   }
 }
