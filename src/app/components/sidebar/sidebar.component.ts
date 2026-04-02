@@ -13,9 +13,9 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
          routerLinkActive="active"
          [routerLinkActiveOptions]="{ exact: true }"
          class="nav-item"
-         title="Project Hub">
-        <span class="nav-icon">🎮</span>
-        <span class="nav-label">Hub</span>
+         title="Home">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Home</span>
       </a>
 
       <a routerLink="/subtitler"
