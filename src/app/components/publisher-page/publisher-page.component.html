@@ -80,6 +80,27 @@
           @if (!showVideoCount() && !showTestMode()) {
             <div class="no-options">No additional options for this mode.</div>
           }
+           <!-- Schedule Times — always visible -->
+          <div class="option-row option-row--stacked">
+            <div class="option-info">
+              <span class="option-name">Daily Post Times</span>
+              <span class="option-desc">Times of day videos are scheduled — saved with the Save button</span>
+            </div>
+            <div class="time-chip-list">
+              @for (t of scheduleTimes(); track $index; let i = $index) {
+                <div class="time-chip">
+                  <input type="time" class="time-input"
+                         [ngModel]="t" (ngModelChange)="updateTime(i, $event)">
+                  <button class="time-chip-remove"
+                          [disabled]="scheduleTimes().length <= 1"
+                          (click)="removeTime(i)" title="Remove">×</button>
+                </div>
+              }
+              @if (scheduleTimes().length < 8) {
+                <button class="time-add-btn" (click)="addTime()" title="Add slot">+</button>
+              }
+            </div>
+          </div>
         </div>
       </section>
 

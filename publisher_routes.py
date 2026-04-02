@@ -159,3 +159,37 @@ def delete_data_file(key: str):
         raise HTTPException(404, "File not found")
     os.remove(full)
     return {"ok": True}
+
+
+# ─── Schedule Times ───────────────────────────────────────────────────────────
+
+HUB_SETTINGS_FILE = os.path.join(THIS_DIR, "hub_settings.json")
+DEFAULT_SCHEDULE_TIMES = ["10:00", "12:00", "16:00", "18:00", "20:00"]
+
+class ScheduleTimesPayload(BaseModel):
+    times: list[str]
+
+def _read_hub_settings() -> dict:
+    if os.path.exists(HUB_SETTINGS_FILE):
+        try:
+            with open(HUB_SETTINGS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+def _write_hub_settings(patch: dict) -> None:
+    data = _read_hub_settings()
+    data.update(patch)
+    with open(HUB_SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+@router.get("/schedule-times")
+def get_schedule_times():
+    d = _read_hub_settings()
+    return {"times": d.get("schedule_times", DEFAULT_SCHEDULE_TIMES)}
+
+@router.post("/schedule-times")
+def post_schedule_times(payload: ScheduleTimesPayload):
+    _write_hub_settings({"schedule_times": sorted(payload.times)})
+    return {"ok": True}

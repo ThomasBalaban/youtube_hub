@@ -122,6 +122,10 @@ export class PublisherPageComponent extends PollingComponent {
   selectedContent = signal<any>(null);
   dataLoading     = signal(false);
 
+  // ── Schedule times ────────────────────────────────────────────────────────
+  scheduleTimes  = signal<string[]>(['10:00', '12:00', '16:00', '18:00', '20:00']);
+  timesLoaded    = signal(false);
+
   // ── Clear modal ───────────────────────────────────────────────────────────
   showClearModal = signal(false);
   clearing       = signal(false);
@@ -202,6 +206,15 @@ export class PublisherPageComponent extends PollingComponent {
         this.videoCount.set(s.VIDEOS_TO_PROCESS_COUNT);
         this.testMode.set(s.TEST_MODE);
         this.settingsLoaded.set(true);
+      }
+
+      if (!this.timesLoaded()) {
+        const timesRes = await fetch('/launcher/publisher/schedule-times').catch(() => null);
+        if (timesRes?.ok) {
+          const d = await timesRes.json();
+          if (d.times?.length) this.scheduleTimes.set(d.times);
+          this.timesLoaded.set(true);
+        }
       }
     } catch {
       this.launcherOnline.set(false);
@@ -303,6 +316,24 @@ export class PublisherPageComponent extends PollingComponent {
     } finally {
       this.actionPending.set(false);
     }
+  }
+
+  updateTime(i: number, val: string) {
+    this.scheduleTimes.update(times => {
+      const copy = [...times];
+      copy[i] = val;
+      return copy;
+    });
+  }
+
+  addTime() {
+    if (this.scheduleTimes().length >= 8) return;
+    this.scheduleTimes.update(times => [...times, '12:00']);
+  }
+
+  removeTime(i: number) {
+    if (this.scheduleTimes().length <= 1) return;
+    this.scheduleTimes.update(times => times.filter((_, idx) => idx !== i));
   }
 
   async refreshLogs() {
