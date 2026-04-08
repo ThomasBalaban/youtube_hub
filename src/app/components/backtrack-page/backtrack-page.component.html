@@ -1,0 +1,128 @@
+<div class="bt-page">
+  <div class="bt-header">
+    <div class="bt-header-left">
+      <a routerLink="/" class="back-btn"><span>←</span><span>Hub</span></a>
+      <div class="title-block">
+        <h1 class="bt-title"><span class="icon" style="color: #a855f7;">🔍</span> Backtrack Scanner</h1>
+        <span class="sub-label">Scan SMB drive and copy videos locally</span>
+      </div>
+    </div>
+    <div class="bt-header-right">
+      <div class="status-strip" [style.--sc]="statusMeta().color">
+        @if (isStarting()) { <span class="strip-spinner"></span> }
+        @else { <span>{{ statusMeta().icon }}</span> }
+        <span>{{ statusMeta().label }}</span>
+        @if (serviceStatus()?.pid) { <span class="strip-pid">PID {{ serviceStatus()!.pid }}</span> }
+      </div>
+      <span class="last-upd">{{ lastUpdated() }}</span>
+    </div>
+  </div>
+
+  @if (!launcherOnline()) {
+    <div class="banner-warn">⚠ Launcher offline — start it with <code>npm start</code></div>
+  }
+
+  <div class="bt-panels">
+    
+    <div class="left-panel">
+      <div class="controls-panel">
+        <button class="btn btn-run" 
+                [disabled]="!launcherOnline() || isRunning() || isStarting() || actionPending()"
+                (click)="serviceAction('start')">
+          ▶ Run Scanner
+        </button>
+        <button class="btn btn-stop" 
+                [disabled]="!launcherOnline() || (!isRunning() && !isStarting()) || actionPending()"
+                (click)="serviceAction('stop')">
+          ■ Stop
+        </button>
+      </div>
+
+      <div class="log-section">
+        <div class="log-header">
+          <div class="log-header-left">
+            <h2>Scanner Output</h2>
+            @if (isRunning()) { <span class="live-badge">● live</span> }
+          </div>
+          <div class="log-header-right">
+            <button class="log-btn" (click)="refreshLogs()">↻</button>
+            <button class="log-btn log-btn--clear" (click)="clearLogs()">✕</button>
+          </div>
+        </div>
+        <div class="log-body">
+          @for (line of logs(); track $index) {
+            <div class="log-line" [class.err]="isErr(line)" [class.ok]="isOk(line)" [class.warn]="isWarn(line)">
+              {{ line }}
+            </div>
+          }
+          @if (!logs().length) {
+            <div class="log-empty">No output yet. Click 'Run Scanner' to start.</div>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="viewer-header">
+        @if (dataViewState() === 'file') {
+          <button class="viewer-back-btn" (click)="backToDataList()">← Back</button>
+          <div class="viewer-title-group">
+            <span class="viewer-title">{{ selectedFile()?.label }}</span>
+            <span class="viewer-path">{{ selectedFile()?.path }}</span>
+          </div>
+        } @else {
+          <span class="viewer-title">Output Files</span>
+          <button class="viewer-refresh-btn" [disabled]="!launcherOnline()" (click)="refreshDataFiles()">
+            ↻ Refresh
+          </button>
+        }
+      </div>
+
+      @if (dataViewState() === 'list') {
+        <div class="data-file-list">
+          @for (file of dataFiles(); track file.key) {
+            <button class="data-file-row" [class.missing]="!file.exists"
+                    [disabled]="!file.exists" (click)="openDataFile(file)">
+              <span class="data-file-icon">{{ file.exists ? '📄' : '○' }}</span>
+              <div class="data-file-info">
+                <span class="data-file-label">{{ file.label }}</span>
+                <span class="data-file-desc">{{ file.description }}</span>
+                @if (file.exists) {
+                  <span class="data-file-meta">{{ formatSize(file.size) }} · {{ formatDate(file.modified) }}</span>
+                } @else {
+                  <span class="data-file-missing">Not yet generated</span>
+                }
+              </div>
+              @if (file.exists) { <span class="data-file-arrow">›</span> }
+            </button>
+          }
+          @if (!dataFiles().length) {
+            <div class="viewer-empty"><span>—</span><span>Start the launcher to check file status.</span></div>
+          }
+        </div>
+      }
+
+      @if (dataViewState() === 'file') {
+        @if (dataLoading()) {
+          <div class="viewer-empty"><span>⏳</span><span>Loading…</span></div>
+        } @else if (!selectedContent()) {
+          <div class="viewer-empty"><span>⚠</span><span>Could not load file.</span></div>
+        } @else {
+          <div class="content-scroll">
+            @for (item of parsedContentList(); track item.filename) {
+              <div class="simple-row">
+                <span class="simple-title">{{ item.filename }}</span>
+                <span class="pill pill-time">{{ item.timestamp }}</span>
+              </div>
+            }
+            @if (parsedContentList().length === 0) {
+              <div class="viewer-empty"><span>—</span><span>File is empty.</span></div>
+            }
+            <div class="content-footer">{{ parsedContentList().length }} entries</div>
+          </div>
+        }
+      }
+    </div>
+
+  </div>
+</div>

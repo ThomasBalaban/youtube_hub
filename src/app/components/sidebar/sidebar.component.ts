@@ -18,6 +18,14 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         <span class="nav-label">Home</span>
       </a>
 
+      <a routerLink="/backtrack"
+         routerLinkActive="active"
+         class="nav-item"
+         title="Backtrack Scanner">
+        <span class="nav-icon">🔍</span>
+        <span class="nav-label">Scan</span>
+      </a>
+
       <a routerLink="/subtitler"
          routerLinkActive="active"
          class="nav-item"

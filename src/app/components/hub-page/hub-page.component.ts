@@ -19,6 +19,13 @@ interface AppCard {
 export class HubPageComponent {
   cards: AppCard[] = [
     {
+      route: '/backtrack',
+      icon: '🔍',
+      title: 'Backtrack Scanner',
+      description: 'Scan your SMB drive for recent Backtrack recordings, copy them locally, and clean up clustered duplicates.',
+      color: '#a855f7',
+    },
+    {
       route: '/subtitler',
       icon: '💬',
       title: 'SimpleAutoSubs',

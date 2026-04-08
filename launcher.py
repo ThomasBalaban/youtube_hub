@@ -271,6 +271,12 @@ app.include_router(publisher_router, prefix="/launcher")
 from subtitler_routes import router as subtitler_router
 app.include_router(subtitler_router, prefix="/launcher")
 
+# Add the Backtrack router here:
+from backtrack_routes import router as backtrack_router
+app.include_router(backtrack_router, prefix="/launcher")
+
+
+
 # ─────────────────────────────────────────────
 # Routes
 # ─────────────────────────────────────────────

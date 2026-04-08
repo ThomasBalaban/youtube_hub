@@ -100,7 +100,18 @@ SERVICE_DEFS: Dict[str, Dict[str, Any]] = {
         "health_check": "process",
         "managed":      True,
         "is_gui":       True,
-        "color_hint":   "#f87171",     # red
+        "color_hint":   "#f87171", 
+    },
+    "backtrack_scanner": {
+        "label":        "Backtrack Scanner",
+        "description":  "Scans SMB drive for Backtrack videos, copies them locally, and cleans up duplicates",
+        "cmd":          [conda_python("publisher"), "main.py"],
+        "cwd":          os.path.join(PARENT_DIR, "backtrack_scanner"),
+        "port":         None,
+        "health_check": "process",
+        "managed":      True,
+        "is_gui":       False,
+        "color_hint":   "#a855f7",     # purple
     },
 
     # ── Template for future projects ──────────────────────────────────────────
