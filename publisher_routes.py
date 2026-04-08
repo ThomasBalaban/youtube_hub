@@ -6,6 +6,8 @@ and reading its output data files.
 import re
 import os
 import json
+import subprocess
+import sys
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -53,6 +55,7 @@ class PublisherSettings(BaseModel):
     PROCESS_SINGLE_VIDEO: bool
     ENABLE_SCRAPING_MODE: bool
     ENABLE_ANALYSIS_MODE: bool
+    ENABLE_UPLOAD_MODE: bool
     VIDEOS_TO_PROCESS_COUNT: int
     TEST_MODE: bool
 
@@ -75,6 +78,7 @@ def _read_settings() -> PublisherSettings:
         PROCESS_SINGLE_VIDEO=get_bool("PROCESS_SINGLE_VIDEO"),
         ENABLE_SCRAPING_MODE=get_bool("ENABLE_SCRAPING_MODE"),
         ENABLE_ANALYSIS_MODE=get_bool("ENABLE_ANALYSIS_MODE"),
+        ENABLE_UPLOAD_MODE=get_bool("ENABLE_UPLOAD_MODE"),
         VIDEOS_TO_PROCESS_COUNT=get_int("VIDEOS_TO_PROCESS_COUNT"),
         TEST_MODE=get_bool("TEST_MODE"),
     )
@@ -97,6 +101,7 @@ def _write_settings(settings: PublisherSettings) -> None:
     replace_bool("PROCESS_SINGLE_VIDEO", settings.PROCESS_SINGLE_VIDEO)
     replace_bool("ENABLE_SCRAPING_MODE", settings.ENABLE_SCRAPING_MODE)
     replace_bool("ENABLE_ANALYSIS_MODE", settings.ENABLE_ANALYSIS_MODE)
+    replace_bool("ENABLE_UPLOAD_MODE",   settings.ENABLE_UPLOAD_MODE)
     replace_int("VIDEOS_TO_PROCESS_COUNT", settings.VIDEOS_TO_PROCESS_COUNT)
     replace_bool("TEST_MODE", settings.TEST_MODE)
 
@@ -193,3 +198,29 @@ def get_schedule_times():
 def post_schedule_times(payload: ScheduleTimesPayload):
     _write_hub_settings({"schedule_times": sorted(payload.times)})
     return {"ok": True}
+
+
+# ─── Check Unuploaded ─────────────────────────────────────────────────────────
+
+@router.post("/check-unuploaded")
+def run_check_unuploaded():
+    """Run uploader/check_unuploaded.py as a subprocess and return its stdout."""
+    script = os.path.join(PUBLISHER_DIR, "uploader", "check_unuploaded.py")
+    if not os.path.exists(script):
+        raise HTTPException(404, f"Script not found: {script}")
+    try:
+        result = subprocess.run(
+            [sys.executable, "-u", script],
+            cwd=PUBLISHER_DIR,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        output = result.stdout
+        if result.stderr:
+            output += "\nSTDERR:\n" + result.stderr
+        return {"ok": result.returncode == 0, "output": output.strip()}
+    except subprocess.TimeoutExpired:
+        raise HTTPException(500, "Script timed out after 60s")
+    except Exception as e:
+        raise HTTPException(500, str(e))

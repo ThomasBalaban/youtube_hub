@@ -4,12 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { PollingComponent } from '../../shared/polling.component';
 
-export type RunMode = 'analysis' | 'scraping' | 'publisher_single' | 'publisher_batch';
+export type RunMode = 'analysis' | 'scraping' | 'publisher_single' | 'publisher_batch' | 'uploader' | 'check_unuploaded';
 
 export interface PublisherSettings {
   PROCESS_SINGLE_VIDEO: boolean;
   ENABLE_SCRAPING_MODE: boolean;
   ENABLE_ANALYSIS_MODE: boolean;
+  ENABLE_UPLOAD_MODE: boolean;
   VIDEOS_TO_PROCESS_COUNT: number;
   TEST_MODE: boolean;
 }
@@ -30,8 +31,6 @@ interface DataFileMeta {
   modified: number | null;
 }
 
-// ── Exact JSON schemas from youtube_shorts_publisher ──────────────────────────
-
 interface DraftAnalysisEntry {
   description: string;
   virality: number;
@@ -42,12 +41,12 @@ interface DraftAnalysisEntry {
   youtube_description: string;
   hashtags: string[];
   tags: string;
-  title: string;        // original title
+  title: string;
 }
 
 interface FailedShortsEntry {
   title: string;
-  error: string;        // multiline — use white-space: pre-wrap
+  error: string;
   timestamp: string;
 }
 
@@ -59,21 +58,22 @@ interface DraftVideoEntry {
 interface BacktrackVideoEntry {
   title: string;
   has_backtrack: boolean;
-  current_status: string;   // e.g. "Draft"
+  current_status: string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
 const MODE_META: Record<RunMode, { label: string; icon: string; desc: string; color: string }> = {
-  analysis:         { label: 'AI Analysis',  icon: '🤖', desc: 'Download drafts & analyze with Gemini',        color: '#a78bfa' },
-  scraping:         { label: 'Scraper',       icon: '🕷',  desc: 'Scan & export draft/scheduled data to JSON',  color: '#fbbf24' },
-  publisher_single: { label: 'Publish One',   icon: '▶',  desc: 'Process a single draft from analysis results', color: '#4ade80' },
-  publisher_batch:  { label: 'Publish Batch', icon: '⚡', desc: 'Process multiple drafts up to the set limit',  color: '#f87171' },
+  analysis:         { label: 'AI Analysis',      icon: '🤖', desc: 'Download drafts & analyze with Gemini',        color: '#a78bfa' },
+  scraping:         { label: 'Scraper',           icon: '🕷',  desc: 'Scan & export draft/scheduled data to JSON',  color: '#fbbf24' },
+  publisher_single: { label: 'Publish One',       icon: '▶',  desc: 'Process a single draft from analysis results', color: '#4ade80' },
+  publisher_batch:  { label: 'Publish Batch',     icon: '⚡', desc: 'Process multiple drafts up to the set limit',  color: '#f87171' },
+  uploader:         { label: 'Uploader',          icon: '📤', desc: 'Upload processed videos from output folder',   color: '#60a5fa' },
+  check_unuploaded: { label: 'Check Unuploaded',  icon: '🔍', desc: 'Audit output folder against upload log',       color: '#34d399' },
 };
 
 function settingsToMode(s: PublisherSettings): RunMode {
   if (s.ENABLE_ANALYSIS_MODE) return 'analysis';
   if (s.ENABLE_SCRAPING_MODE) return 'scraping';
+  if (s.ENABLE_UPLOAD_MODE)   return 'uploader';
   if (s.PROCESS_SINGLE_VIDEO) return 'publisher_single';
   return 'publisher_batch';
 }
@@ -82,6 +82,7 @@ function modeToFlags(mode: RunMode) {
   return {
     ENABLE_ANALYSIS_MODE: mode === 'analysis',
     ENABLE_SCRAPING_MODE: mode === 'scraping',
+    ENABLE_UPLOAD_MODE:   mode === 'uploader',
     PROCESS_SINGLE_VIDEO: mode === 'publisher_single',
   };
 }
@@ -97,7 +98,7 @@ export class PublisherPageComponent extends PollingComponent {
   protected override pollingInterval = 4000;
 
   readonly MODE_META = MODE_META;
-  readonly modes: RunMode[] = ['analysis', 'scraping', 'publisher_single', 'publisher_batch'];
+  readonly modes: RunMode[] = ['analysis', 'scraping', 'publisher_single', 'publisher_batch', 'uploader', 'check_unuploaded'];
   readonly Math = Math;
 
   // ── Publisher controls ────────────────────────────────────────────────────
@@ -129,6 +130,12 @@ export class PublisherPageComponent extends PollingComponent {
   // ── Clear modal ───────────────────────────────────────────────────────────
   showClearModal = signal(false);
   clearing       = signal(false);
+
+  // ── Check Unuploaded ──────────────────────────────────────────────────────
+  checkPending = signal(false);
+  checkOutput  = signal('');
+  checkError   = signal('');
+  checkOk      = signal(false);
 
   // ── Computed ──────────────────────────────────────────────────────────────
   isRunning  = computed(() => this.serviceStatus()?.status === 'online');
@@ -301,6 +308,11 @@ export class PublisherPageComponent extends PollingComponent {
   }
 
   async saveAndRun() {
+    // Check Unuploaded is a one-shot script — no settings save or service start needed
+    if (this.selectedMode() === 'check_unuploaded') {
+      await this.runCheckUnuploaded();
+      return;
+    }
     await this.saveSettings();
     if (this.saveError()) return;
     await this.serviceAction('start');
@@ -345,5 +357,31 @@ export class PublisherPageComponent extends PollingComponent {
   async clearLogs() {
     await fetch('/launcher/services/youtube_publisher/logs', { method: 'DELETE' }).catch(() => {});
     this.logs.set([]);
+  }
+
+  // ── Check Unuploaded ──────────────────────────────────────────────────────
+  async runCheckUnuploaded() {
+    if (this.checkPending()) return;
+    this.checkPending.set(true);
+    this.checkOutput.set('');
+    this.checkError.set('');
+    this.checkOk.set(false);
+    try {
+      const res = await fetch('/launcher/publisher/check-unuploaded', { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      this.checkOutput.set(data.output ?? '(no output)');
+      this.checkOk.set(data.ok);
+    } catch (e: any) {
+      this.checkError.set(e?.message ?? 'Audit failed');
+    } finally {
+      this.checkPending.set(false);
+    }
+  }
+
+  clearCheckOutput() {
+    this.checkOutput.set('');
+    this.checkError.set('');
+    this.checkOk.set(false);
   }
 }

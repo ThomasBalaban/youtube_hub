@@ -80,7 +80,7 @@
           @if (!showVideoCount() && !showTestMode()) {
             <div class="no-options">No additional options for this mode.</div>
           }
-           <!-- Schedule Times — always visible -->
+          <!-- Schedule Times — always visible -->
           <div class="option-row option-row--stacked">
             <div class="option-info">
               <span class="option-name">Daily Post Times</span>
@@ -112,9 +112,10 @@
             @else { 💾 Save }
           </button>
           <button class="btn btn-run"
-                  [disabled]="saving() || actionPending() || !launcherOnline() || isRunning() || isStarting()"
+                  [disabled]="saving() || actionPending() || checkPending() || !launcherOnline() || isRunning() || isStarting()"
                   (click)="saveAndRun()">
-            @if (actionPending() && !isRunning()) { <span class="btn-spin"></span>Starting… }
+            @if (checkPending()) { <span class="btn-spin"></span>Auditing… }
+            @else if (actionPending() && !isRunning()) { <span class="btn-spin"></span>Starting… }
             @else { ▶ Save &amp; Run }
           </button>
           @if (isRunning() || isStarting()) {
@@ -129,6 +130,16 @@
           }
         </div>
         @if (saveError()) { <div class="error-msg">⚠ {{ saveError() }}</div> }
+        @if (checkError()) { <div class="error-msg">⚠ {{ checkError() }}</div> }
+        @if (checkOutput()) {
+          <div class="audit-panel" [class.audit-panel--ok]="checkOk()">
+            <div class="audit-panel-header">
+              <span class="audit-panel-title">{{ checkOk() ? '✓' : '⚠' }} Audit Output</span>
+              <button class="audit-clear-btn" (click)="clearCheckOutput()">✕</button>
+            </div>
+            <pre class="audit-body">{{ checkOutput() }}</pre>
+          </div>
+        }
       </section>
 
       <section class="section log-section">
@@ -177,7 +188,6 @@
         }
       </div>
 
-      <!-- File list ─────────────────────────────────────────────────────── -->
       @if (dataViewState() === 'list') {
         <div class="data-file-list">
           @for (file of dataFiles(); track file.key) {
@@ -202,7 +212,6 @@
         </div>
       }
 
-      <!-- File content ──────────────────────────────────────────────────── -->
       @if (dataViewState() === 'file') {
         @if (dataLoading()) {
           <div class="viewer-empty"><span>⏳</span><span>Loading…</span></div>
@@ -210,12 +219,10 @@
           <div class="viewer-empty"><span>⚠</span><span>Could not load file.</span></div>
         } @else {
 
-          <!-- draft_analysis ─────────────────────────────────────────────── -->
           @if (selectedFile()?.key === 'draft_analysis') {
             <div class="content-scroll">
               @for (item of asDraftAnalysis(); track $index) {
                 <div class="analysis-card">
-
                   <div class="analysis-header">
                     <div class="analysis-titles">
                       <span class="analysis-new-title">{{ item.new_title }}</span>
@@ -228,7 +235,6 @@
                       {{ item.virality }}<span class="virality-denom">/10</span>
                     </div>
                   </div>
-
                   <div class="analysis-pills">
                     @if (item.game_name && item.game_name !== 'Unknown') {
                       <span class="pill pill-game">🎮 {{ item.game_name }}</span>
@@ -240,21 +246,17 @@
                       <span class="pill pill-tag">{{ tag }}</span>
                     }
                   </div>
-
                   <p class="analysis-reasoning">{{ item.virality_reasoning }}</p>
-
                   <div class="analysis-caption">
                     <span class="caption-label">Caption</span>
                     <span class="caption-text">{{ item.youtube_description }}</span>
                   </div>
-
                 </div>
               }
               <div class="content-footer">{{ asDraftAnalysis().length }} entries</div>
             </div>
           }
 
-          <!-- failed_shorts ──────────────────────────────────────────────── -->
           @else if (selectedFile()?.key === 'failed_shorts') {
             <div class="content-scroll">
               @for (item of asFailedShorts(); track $index) {
@@ -270,7 +272,6 @@
             </div>
           }
 
-          <!-- backtrack_videos ───────────────────────────────────────────── -->
           @else if (selectedFile()?.key === 'backtrack_videos') {
             <div class="content-scroll">
               @for (item of asBacktrack(); track $index) {
@@ -290,7 +291,6 @@
             </div>
           }
 
-          <!-- draft_videos ───────────────────────────────────────────────── -->
           @else if (selectedFile()?.key === 'draft_videos') {
             <div class="content-scroll">
               @for (item of asDraftVideos(); track $index) {
@@ -305,7 +305,6 @@
             </div>
           }
 
-          <!-- scheduled_videos (schema TBD) ─────────────────────────────── -->
           @else {
             <div class="content-scroll">
               <pre class="raw-json">{{ selectedContent() | json }}</pre>
@@ -315,10 +314,9 @@
         }
       }
 
-    </div><!-- /right-panel -->
-  </div><!-- /pub-panels -->
+    </div>
+  </div>
 
-  <!-- ── Clear confirmation modal ─────────────────────────────────────────── -->
   @if (showClearModal()) {
     <div class="modal-overlay" (click)="cancelClear()">
       <div class="modal" (click)="$event.stopPropagation()">
@@ -330,9 +328,7 @@
           This cannot be undone.
         </p>
         <div class="modal-actions">
-          <button class="modal-btn modal-btn-cancel" [disabled]="clearing()" (click)="cancelClear()">
-            Cancel
-          </button>
+          <button class="modal-btn modal-btn-cancel" [disabled]="clearing()" (click)="cancelClear()">Cancel</button>
           <button class="modal-btn modal-btn-confirm" [disabled]="clearing()" (click)="confirmClear()">
             @if (clearing()) { <span class="btn-spin"></span>Deleting… } @else { Delete }
           </button>
