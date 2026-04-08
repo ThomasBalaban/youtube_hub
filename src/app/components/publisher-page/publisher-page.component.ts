@@ -12,7 +12,6 @@ export interface PublisherSettings {
   ENABLE_ANALYSIS_MODE: boolean;
   ENABLE_UPLOAD_MODE: boolean;
   VIDEOS_TO_PROCESS_COUNT: number;
-  TEST_MODE: boolean;
 }
 
 interface ServiceStatus {
@@ -62,12 +61,12 @@ interface BacktrackVideoEntry {
 }
 
 const MODE_META: Record<RunMode, { label: string; icon: string; desc: string; color: string }> = {
-  analysis:         { label: 'AI Analysis',      icon: '🤖', desc: 'Download drafts & analyze with Gemini',        color: '#a78bfa' },
-  scraping:         { label: 'Scraper',           icon: '🕷',  desc: 'Scan & export draft/scheduled data to JSON',  color: '#fbbf24' },
-  publisher_single: { label: 'Publish One',       icon: '▶',  desc: 'Process a single draft from analysis results', color: '#4ade80' },
-  publisher_batch:  { label: 'Publish Batch',     icon: '⚡', desc: 'Process multiple drafts up to the set limit',  color: '#f87171' },
-  uploader:         { label: 'Uploader',          icon: '📤', desc: 'Upload processed videos from output folder',   color: '#60a5fa' },
-  check_unuploaded: { label: 'Check Unuploaded',  icon: '🔍', desc: 'Audit output folder against upload log',       color: '#34d399' },
+  analysis:         { label: 'AI Analysis',     icon: '🤖', desc: 'Download drafts & analyze with Gemini',        color: '#a78bfa' },
+  scraping:         { label: 'Scraper',          icon: '🕷',  desc: 'Scan & export draft/scheduled data to JSON',  color: '#fbbf24' },
+  publisher_single: { label: 'Publish One',      icon: '▶',  desc: 'Process a single draft from analysis results', color: '#4ade80' },
+  publisher_batch:  { label: 'Publish Batch',    icon: '⚡', desc: 'Process multiple drafts up to the set limit',  color: '#f87171' },
+  uploader:         { label: 'Uploader',         icon: '📤', desc: 'Upload processed videos from output folder',   color: '#60a5fa' },
+  check_unuploaded: { label: 'Check Unuploaded', icon: '🔍', desc: 'Audit output folder against upload log',       color: '#34d399' },
 };
 
 function settingsToMode(s: PublisherSettings): RunMode {
@@ -104,7 +103,6 @@ export class PublisherPageComponent extends PollingComponent {
   // ── Publisher controls ────────────────────────────────────────────────────
   selectedMode   = signal<RunMode>('publisher_batch');
   videoCount     = signal(50);
-  testMode       = signal(false);
   serviceStatus  = signal<ServiceStatus | null>(null);
   launcherOnline = signal(false);
   saving         = signal(false);
@@ -115,6 +113,8 @@ export class PublisherPageComponent extends PollingComponent {
   lastUpdated    = signal('—');
   settingsLoaded = signal(false);
   logs           = signal<string[]>([]);
+  checkPending   = signal(false);
+  checkError     = signal('');
 
   // ── Data viewer ───────────────────────────────────────────────────────────
   dataFiles       = signal<DataFileMeta[]>([]);
@@ -124,27 +124,18 @@ export class PublisherPageComponent extends PollingComponent {
   dataLoading     = signal(false);
 
   // ── Schedule times ────────────────────────────────────────────────────────
-  scheduleTimes  = signal<string[]>(['10:00', '12:00', '16:00', '18:00', '20:00']);
-  timesLoaded    = signal(false);
+  scheduleTimes = signal<string[]>(['10:00', '12:00', '16:00', '18:00', '20:00']);
+  timesLoaded   = signal(false);
 
   // ── Clear modal ───────────────────────────────────────────────────────────
   showClearModal = signal(false);
   clearing       = signal(false);
-
-  // ── Check Unuploaded ──────────────────────────────────────────────────────
-  checkPending = signal(false);
-  checkOutput  = signal('');
-  checkError   = signal('');
-  checkOk      = signal(false);
 
   // ── Computed ──────────────────────────────────────────────────────────────
   isRunning  = computed(() => this.serviceStatus()?.status === 'online');
   isStarting = computed(() => this.serviceStatus()?.status === 'starting');
   isStopping = computed(() => this.serviceStatus()?.status === 'stopping');
   showVideoCount = computed(() => this.selectedMode() === 'publisher_batch');
-  showTestMode   = computed(() =>
-    this.selectedMode() === 'publisher_single' || this.selectedMode() === 'publisher_batch'
-  );
 
   statusMeta = computed(() => {
     const s = this.serviceStatus()?.status ?? 'unknown';
@@ -211,7 +202,6 @@ export class PublisherPageComponent extends PollingComponent {
         const s: PublisherSettings = await settingsRes.json();
         this.selectedMode.set(settingsToMode(s));
         this.videoCount.set(s.VIDEOS_TO_PROCESS_COUNT);
-        this.testMode.set(s.TEST_MODE);
         this.settingsLoaded.set(true);
       }
 
@@ -230,7 +220,11 @@ export class PublisherPageComponent extends PollingComponent {
       this.loading.set(false);
     }
 
-    await this.refreshLogs();
+    // Only sync logs from the service when check_unuploaded isn't running
+    // (to avoid clobbering audit output mid-display)
+    if (!this.checkPending()) {
+      await this.refreshLogs();
+    }
     if (this.dataViewState() === 'list') await this.refreshDataFiles();
   }
 
@@ -290,7 +284,6 @@ export class PublisherPageComponent extends PollingComponent {
     const payload: PublisherSettings = {
       ...modeToFlags(this.selectedMode()),
       VIDEOS_TO_PROCESS_COUNT: this.videoCount(),
-      TEST_MODE: this.testMode(),
     };
     try {
       const res = await fetch('/launcher/publisher/settings', {
@@ -308,7 +301,6 @@ export class PublisherPageComponent extends PollingComponent {
   }
 
   async saveAndRun() {
-    // Check Unuploaded is a one-shot script — no settings save or service start needed
     if (this.selectedMode() === 'check_unuploaded') {
       await this.runCheckUnuploaded();
       return;
@@ -359,29 +351,26 @@ export class PublisherPageComponent extends PollingComponent {
     this.logs.set([]);
   }
 
-  // ── Check Unuploaded ──────────────────────────────────────────────────────
+  // ── Check Unuploaded — output goes straight into the log panel ────────────
   async runCheckUnuploaded() {
     if (this.checkPending()) return;
     this.checkPending.set(true);
-    this.checkOutput.set('');
     this.checkError.set('');
-    this.checkOk.set(false);
+    const ts = new Date().toLocaleTimeString();
+    this.logs.update(l => [...l, `[${ts}] --- Check Unuploaded ---`]);
     try {
       const res = await fetch('/launcher/publisher/check-unuploaded', { method: 'POST' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      this.checkOutput.set(data.output ?? '(no output)');
-      this.checkOk.set(data.ok);
+      const lines = (data.output ?? '(no output)')
+        .split('\n')
+        .map((line: string) => `[${ts}] ${line}`);
+      this.logs.update(l => [...l, ...lines]);
     } catch (e: any) {
       this.checkError.set(e?.message ?? 'Audit failed');
+      this.logs.update(l => [...l, `[${ts}] ❌ Audit failed: ${e?.message}`]);
     } finally {
       this.checkPending.set(false);
     }
-  }
-
-  clearCheckOutput() {
-    this.checkOutput.set('');
-    this.checkError.set('');
-    this.checkOk.set(false);
   }
 }

@@ -65,19 +65,7 @@
                 <button class="count-btn" (click)="videoCount.set(Math.min(500, videoCount() + 1))">+</button>
               </div>
             </div>
-          }
-          @if (showTestMode()) {
-            <div class="option-row">
-              <div class="option-info">
-                <span class="option-name">Test Mode</span>
-                <span class="option-desc">Fill metadata but <strong>skip final Save/Publish</strong></span>
-              </div>
-              <button class="toggle" [class.on]="testMode()" (click)="testMode.set(!testMode())">
-                <span class="toggle-knob"></span>
-              </button>
-            </div>
-          }
-          @if (!showVideoCount() && !showTestMode()) {
+          } @else {
             <div class="no-options">No additional options for this mode.</div>
           }
           <!-- Schedule Times — always visible -->
@@ -131,22 +119,13 @@
         </div>
         @if (saveError()) { <div class="error-msg">⚠ {{ saveError() }}</div> }
         @if (checkError()) { <div class="error-msg">⚠ {{ checkError() }}</div> }
-        @if (checkOutput()) {
-          <div class="audit-panel" [class.audit-panel--ok]="checkOk()">
-            <div class="audit-panel-header">
-              <span class="audit-panel-title">{{ checkOk() ? '✓' : '⚠' }} Audit Output</span>
-              <button class="audit-clear-btn" (click)="clearCheckOutput()">✕</button>
-            </div>
-            <pre class="audit-body">{{ checkOutput() }}</pre>
-          </div>
-        }
       </section>
 
       <section class="section log-section">
         <div class="log-header">
           <div class="log-header-left">
             <h2 class="section-title" style="margin:0">stdout</h2>
-            @if (isRunning()) { <span class="live-badge">● live</span> }
+            @if (isRunning() || checkPending()) { <span class="live-badge">● live</span> }
           </div>
           <div class="log-header-right">
             <button class="log-btn" (click)="refreshLogs()">↻</button>

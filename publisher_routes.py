@@ -57,7 +57,6 @@ class PublisherSettings(BaseModel):
     ENABLE_ANALYSIS_MODE: bool
     ENABLE_UPLOAD_MODE: bool
     VIDEOS_TO_PROCESS_COUNT: int
-    TEST_MODE: bool
 
 
 def _read_settings() -> PublisherSettings:
@@ -80,7 +79,6 @@ def _read_settings() -> PublisherSettings:
         ENABLE_ANALYSIS_MODE=get_bool("ENABLE_ANALYSIS_MODE"),
         ENABLE_UPLOAD_MODE=get_bool("ENABLE_UPLOAD_MODE"),
         VIDEOS_TO_PROCESS_COUNT=get_int("VIDEOS_TO_PROCESS_COUNT"),
-        TEST_MODE=get_bool("TEST_MODE"),
     )
 
 
@@ -103,7 +101,6 @@ def _write_settings(settings: PublisherSettings) -> None:
     replace_bool("ENABLE_ANALYSIS_MODE", settings.ENABLE_ANALYSIS_MODE)
     replace_bool("ENABLE_UPLOAD_MODE",   settings.ENABLE_UPLOAD_MODE)
     replace_int("VIDEOS_TO_PROCESS_COUNT", settings.VIDEOS_TO_PROCESS_COUNT)
-    replace_bool("TEST_MODE", settings.TEST_MODE)
 
     with open(SETTINGS_PATH, "w") as f:
         f.write(content)
