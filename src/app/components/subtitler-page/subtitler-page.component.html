@@ -1,21 +1,20 @@
-<div class="sub-page">
+<div class="page-container">
 
-  <!-- ── Header ─────────────────────────────────────────────────────────── -->
-  <div class="sub-header">
-    <div class="sub-header-left">
+  <div class="page-header">
+    <div class="header-left">
       <a routerLink="/" class="back-btn" title="Back to Hub">
-        <span class="back-arrow">←</span><span>Hub</span>
+        <span>←</span><span>Hub</span>
       </a>
       <div class="title-block">
-        <h1 class="sub-title"><span class="sub-icon">💬</span> SimpleAutoSubs</h1>
+        <h1 class="page-title"><span class="sub-icon">💬</span> SimpleAutoSubs</h1>
         <span class="sub-label">Queue videos, adjust settings, and process without the GUI</span>
       </div>
     </div>
-    <div class="sub-header-right">
+    <div class="header-right">
       <div class="status-strip" [style.--sc]="serviceStatusMeta().color">
         @if (actionPending()) { <span class="strip-spinner"></span> }
-        @else { <span class="strip-dot">{{ serviceStatusMeta().icon }}</span> }
-        <span class="strip-label">{{ serviceStatusMeta().label }}</span>
+        @else { <span>{{ serviceStatusMeta().icon }}</span> }
+        <span>{{ serviceStatusMeta().label }}</span>
         @if (serviceStatus()?.pid) { <span class="strip-pid">PID {{ serviceStatus()!.pid }}</span> }
       </div>
       @if (serviceStatus()?.status === 'offline' || serviceStatus()?.status === 'unknown') {
@@ -29,20 +28,16 @@
     </div>
   </div>
 
-  <!-- ── Banners ─────────────────────────────────────────────────────────── -->
   @if (!launcherOnline()) {
-    <div class="banner banner-warn">⚠ Launcher offline — start it with <code>npm start</code></div>
+    <div class="banner-warn">⚠ Launcher offline — start it with <code>npm start</code></div>
   } @else if (!apiOnline()) {
-    <div class="banner banner-info">💡 Start the SimpleAutoSubs API using the button above to queue files and process them.</div>
+    <div class="banner-info">💡 Start the SimpleAutoSubs API using the button above to queue files and process them.</div>
   }
 
-  <!-- ── Two-panel body ──────────────────────────────────────────────────── -->
-  <div class="sub-panels">
+  <div class="page-panels">
 
-    <!-- ── LEFT: controls ──────────────────────────────────────────────── -->
     <div class="left-panel">
 
-      <!-- File Queue -->
       <section class="section">
         <div class="section-header">
           <div>
@@ -95,7 +90,6 @@
         }
       </section>
 
-      <!-- Settings -->
       <section class="section">
         <h2 class="section-title">Settings</h2>
         <div class="settings-grid">
@@ -142,7 +136,6 @@
         </div>
       </section>
 
-      <!-- Controls -->
       <section class="section controls-section">
         <div class="ctrl-row">
           <button class="btn btn-save" [disabled]="saving() || !apiOnline()" (click)="saveSettings()">
@@ -164,16 +157,15 @@
         @if (saveError()) { <div class="error-msg">⚠ {{ saveError() }}</div> }
       </section>
 
-      <!-- Live API log -->
-      <section class="section log-section">
+      <section class="log-section">
         <div class="log-header">
           <div class="log-header-left">
             <h2 class="section-title" style="margin:0">stdout — API</h2>
             @if (isProcessing()) { <span class="live-badge">● live</span> }
           </div>
           <div class="log-header-right">
-            <button class="log-action-btn" (click)="poll()">↻</button>
-            <button class="log-action-btn log-action-btn--clear" (click)="clearLogs()">✕</button>
+            <button class="log-btn" (click)="poll()">↻</button>
+            <button class="log-btn log-btn--clear" (click)="clearLogs()">✕</button>
           </div>
         </div>
         <div class="log-body">
@@ -184,12 +176,10 @@
         </div>
       </section>
 
-    </div><!-- /left-panel -->
+    </div>
 
-    <!-- ── RIGHT: session log viewer ───────────────────────────────────── -->
     <div class="right-panel">
 
-      <!-- Panel header -->
       <div class="viewer-header">
         @if (logViewState() === 'file') {
           <button class="viewer-back-btn" (click)="backToLogList()">← Back</button>
@@ -197,13 +187,12 @@
         } @else {
           <span class="viewer-title">Session Logs</span>
           @if (settings().output_dir) {
-            <span class="viewer-dir">{{ settings().output_dir }}</span>
+            <span class="viewer-path">{{ settings().output_dir }}</span>
           }
           <button class="viewer-refresh-btn" [disabled]="!apiOnline()" (click)="refreshLogFiles()" title="Refresh">↻</button>
         }
       </div>
 
-      <!-- File list view -->
       @if (logViewState() === 'list') {
         @if (!settings().output_dir) {
           <div class="viewer-empty">
@@ -221,22 +210,21 @@
             <span>No .txt log files found in the output directory yet.</span>
           </div>
         } @else {
-          <div class="log-file-list">
+          <div class="data-file-list">
             @for (file of logFiles(); track file.path) {
-              <button class="log-file-row" (click)="openLogFile(file)">
-                <span class="log-file-icon">📄</span>
-                <div class="log-file-info">
-                  <span class="log-file-name">{{ file.name }}</span>
-                  <span class="log-file-meta">{{ formatDate(file.modified) }} · {{ formatSize(file.size) }}</span>
+              <button class="data-file-row" (click)="openLogFile(file)">
+                <span class="data-file-icon">📄</span>
+                <div class="data-file-info">
+                  <span class="data-file-label">{{ file.name }}</span>
+                  <span class="data-file-meta">{{ formatDate(file.modified) }} · {{ formatSize(file.size) }}</span>
                 </div>
-                <span class="log-file-arrow">›</span>
+                <span class="data-file-arrow">›</span>
               </button>
             }
           </div>
         }
       }
 
-      <!-- File content view -->
       @if (logViewState() === 'file') {
         @if (logFileLoading()) {
           <div class="viewer-empty"><span class="viewer-empty-icon">⏳</span><span>Loading…</span></div>
@@ -245,7 +233,6 @@
         }
       }
 
-    </div><!-- /right-panel -->
-
-  </div><!-- /sub-panels -->
+    </div>
+  </div>
 </div>

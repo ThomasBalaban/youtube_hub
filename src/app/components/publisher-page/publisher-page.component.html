@@ -1,24 +1,21 @@
-<div class="pub-page">
+<div class="page-container">
 
-  <!-- ── Header ──────────────────────────────────────────────────────────── -->
-  <div class="pub-header">
-    <div class="pub-header-left">
+  <div class="page-header">
+    <div class="header-left">
       <a routerLink="/" class="back-btn">
         <span>←</span><span>Hub</span>
       </a>
       <div class="title-block">
-        <h1 class="pub-title"><span class="yt-icon">▶</span> YouTube Shorts Publisher</h1>
+        <h1 class="page-title"><span class="yt-icon">▶</span> YouTube Shorts Publisher</h1>
         <span class="sub-label">Configure run mode &amp; launch</span>
       </div>
     </div>
-    <div class="pub-header-right">
+    <div class="header-right">
       <div class="status-strip" [style.--sc]="statusMeta().color">
         @if (isStarting() || isStopping()) { <span class="strip-spinner"></span> }
         @else { <span>{{ statusMeta().icon }}</span> }
         <span>{{ statusMeta().label }}</span>
-        @if (serviceStatus()?.pid) {
-          <span class="strip-pid">PID {{ serviceStatus()!.pid }}</span>
-        }
+        @if (serviceStatus()?.pid) { <span class="strip-pid">PID {{ serviceStatus()!.pid }}</span> }
       </div>
       <span class="last-upd">{{ lastUpdated() }}</span>
     </div>
@@ -28,10 +25,8 @@
     <div class="banner-warn">⚠ Launcher offline — start it with <code>npm start</code></div>
   }
 
-  <!-- ── Two-panel body ──────────────────────────────────────────────────── -->
-  <div class="pub-panels">
+  <div class="page-panels">
 
-    <!-- LEFT: controls ───────────────────────────────────────────────────── -->
     <div class="left-panel">
 
       <section class="section">
@@ -68,7 +63,6 @@
           } @else {
             <div class="no-options">No additional options for this mode.</div>
           }
-          <!-- Schedule Times — always visible -->
           <div class="option-row option-row--stacked">
             <div class="option-info">
               <span class="option-name">Daily Post Times</span>
@@ -121,7 +115,7 @@
         @if (checkError()) { <div class="error-msg">⚠ {{ checkError() }}</div> }
       </section>
 
-      <section class="section log-section">
+      <section class="log-section">
         <div class="log-header">
           <div class="log-header-left">
             <h2 class="section-title" style="margin:0">stdout</h2>
@@ -134,19 +128,14 @@
         </div>
         <div class="log-body">
           @for (line of logs(); track $index) {
-            <div class="log-line" [class.err]="isErr(line)" [class.ok]="isOk(line)" [class.warn]="isWarn(line)">
-              {{ line }}
-            </div>
+            <div class="log-line" [class.err]="isErr(line)" [class.ok]="isOk(line)" [class.warn]="isWarn(line)">{{ line }}</div>
           }
-          @if (!logs().length) {
-            <div class="log-empty">No output yet.</div>
-          }
+          @if (!logs().length) { <div class="log-empty">No output yet.</div> }
         </div>
       </section>
 
     </div>
 
-    <!-- RIGHT: data file viewer ──────────────────────────────────────────── -->
     <div class="right-panel">
 
       <div class="viewer-header">
@@ -156,46 +145,36 @@
             <span class="viewer-title">{{ selectedFile()?.label }}</span>
             <span class="viewer-path">{{ selectedFile()?.path }}</span>
           </div>
-          <button class="btn-erase" (click)="openClearModal()" title="Delete this file">
-            🗑 Erase
-          </button>
+          <button class="btn-erase" (click)="openClearModal()" title="Delete this file">🗑 Erase</button>
         } @else {
           <span class="viewer-title">Output Files</span>
-          <button class="viewer-refresh-btn" [disabled]="!launcherOnline()" (click)="refreshDataFiles()">
-            ↻ Refresh
-          </button>
+          <button class="viewer-refresh-btn" [disabled]="!launcherOnline()" (click)="refreshDataFiles()">↻ Refresh</button>
         }
       </div>
 
       @if (dataViewState() === 'list') {
         <div class="data-file-list">
           @for (file of dataFiles(); track file.key) {
-            <button class="data-file-row" [class.missing]="!file.exists"
-                    [disabled]="!file.exists" (click)="openDataFile(file)">
+            <button class="data-file-row" [class.missing]="!file.exists" [disabled]="!file.exists" (click)="openDataFile(file)">
               <span class="data-file-icon">{{ file.exists ? '📄' : '○' }}</span>
               <div class="data-file-info">
                 <span class="data-file-label">{{ file.label }}</span>
                 <span class="data-file-desc">{{ file.description }}</span>
-                @if (file.exists) {
-                  <span class="data-file-meta">{{ formatSize(file.size) }} · {{ formatDate(file.modified) }}</span>
-                } @else {
-                  <span class="data-file-missing">Not yet generated</span>
-                }
+                @if (file.exists) { <span class="data-file-meta">{{ formatSize(file.size) }} · {{ formatDate(file.modified) }}</span> }
+                @else { <span class="data-file-missing">Not yet generated</span> }
               </div>
               @if (file.exists) { <span class="data-file-arrow">›</span> }
             </button>
           }
-          @if (!dataFiles().length) {
-            <div class="viewer-empty"><span>—</span><span>Start the launcher to check file status.</span></div>
-          }
+          @if (!dataFiles().length) { <div class="viewer-empty"><span class="viewer-empty-icon">📂</span><span>Start the launcher to check file status.</span></div> }
         </div>
       }
 
       @if (dataViewState() === 'file') {
         @if (dataLoading()) {
-          <div class="viewer-empty"><span>⏳</span><span>Loading…</span></div>
+          <div class="viewer-empty"><span class="viewer-empty-icon">⏳</span><span>Loading…</span></div>
         } @else if (!selectedContent()) {
-          <div class="viewer-empty"><span>⚠</span><span>Could not load file.</span></div>
+          <div class="viewer-empty"><span class="viewer-empty-icon">⚠</span><span>Could not load file.</span></div>
         } @else {
 
           @if (selectedFile()?.key === 'draft_analysis') {
@@ -215,15 +194,9 @@
                     </div>
                   </div>
                   <div class="analysis-pills">
-                    @if (item.game_name && item.game_name !== 'Unknown') {
-                      <span class="pill pill-game">🎮 {{ item.game_name }}</span>
-                    }
-                    @if (item.is_fnaf_game) {
-                      <span class="pill pill-fnaf">🐻 FNAF</span>
-                    }
-                    @for (tag of item.hashtags; track tag) {
-                      <span class="pill pill-tag">{{ tag }}</span>
-                    }
+                    @if (item.game_name && item.game_name !== 'Unknown') { <span class="pill pill-game">🎮 {{ item.game_name }}</span> }
+                    @if (item.is_fnaf_game) { <span class="pill pill-fnaf">🐻 FNAF</span> }
+                    @for (tag of item.hashtags; track tag) { <span class="pill pill-tag">{{ tag }}</span> }
                   </div>
                   <p class="analysis-reasoning">{{ item.virality_reasoning }}</p>
                   <div class="analysis-caption">
@@ -257,12 +230,8 @@
                 <div class="simple-row">
                   <span class="simple-title">{{ item.title }}</span>
                   <div class="simple-badges">
-                    @if (item.current_status) {
-                      <span class="pill pill-status">{{ item.current_status }}</span>
-                    }
-                    @if (item.has_backtrack) {
-                      <span class="pill pill-backtrack">Backtrack</span>
-                    }
+                    @if (item.current_status) { <span class="pill pill-status">{{ item.current_status }}</span> }
+                    @if (item.has_backtrack) { <span class="pill pill-backtrack">Backtrack</span> }
                   </div>
                 </div>
               }
@@ -275,9 +244,7 @@
               @for (item of asDraftVideos(); track $index) {
                 <div class="simple-row">
                   <span class="simple-title">{{ item.title }}</span>
-                  @if (item.has_backtrack) {
-                    <span class="pill pill-backtrack">Backtrack</span>
-                  }
+                  @if (item.has_backtrack) { <span class="pill pill-backtrack">Backtrack</span> }
                 </div>
               }
               <div class="content-footer">{{ asDraftVideos().length }} entries</div>
@@ -289,7 +256,6 @@
               <pre class="raw-json">{{ selectedContent() | json }}</pre>
             </div>
           }
-
         }
       }
 
