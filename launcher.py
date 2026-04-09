@@ -274,7 +274,7 @@ app.include_router(subtitler_router, prefix="/launcher")
 from backtrack_routes import router as backtrack_router
 app.include_router(backtrack_router, prefix="/launcher")
 
-from pipeline_routes import router as pipeline_router
+from pipeline import router as pipeline_router
 app.include_router(pipeline_router, prefix="/launcher")
 
 # ─────────────────────────────────────────────
