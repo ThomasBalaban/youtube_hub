@@ -19,6 +19,13 @@ interface AppCard {
 export class HubPageComponent {
   cards: AppCard[] = [
     {
+      route: '/auto-run',
+      icon: '⚡',
+      title: 'Auto-Run',
+      description: 'One-click pipeline: scans the SMB drive for new Backtrack recordings, copies them, and automatically runs them through SimpleAutoSubs. Repeats hourly while active.',
+      color: '#fbbf24',
+    },
+    {
       route: '/backtrack',
       icon: '🔍',
       title: 'Backtrack Scanner',

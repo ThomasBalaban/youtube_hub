@@ -3,5 +3,6 @@
   "sync_offset": -0.15,
   "output_dir": "/Users/thomasbalaban/Downloads/projects/SimpleAutoSubs/output",
   "enable_trimming": true,
-  "schedule_times": ["10:00", "12:00", "16:00", "18:00", "20:00"]
+  "schedule_times": ["10:00", "12:00", "16:00", "18:00", "20:00"],
+  "backtrack_dest_dir": "/Users/thomasbalaban/Downloads/todoshorts"
 }

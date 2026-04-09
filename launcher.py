@@ -144,8 +144,6 @@ async def start_service(name: str) -> Dict[str, Any]:
     _append_log(name, f"    cmd: {' '.join(str(c) for c in defn['cmd'])}")
     _append_log(name, f"    cwd: {defn.get('cwd', THIS_DIR)}")
 
-    # Ensure Python output is never buffered regardless of how the interpreter
-    # was invoked (belt-and-suspenders alongside the -u flag in the cmd).
     proc_env = os.environ.copy()
     proc_env["PYTHONUNBUFFERED"] = "1"
 
@@ -173,7 +171,6 @@ async def start_service(name: str) -> Dict[str, Any]:
             _procs[name] = None
             return {"ok": False, "reason": "process_died", "code": p.returncode}
         else:
-            # For process-health services: if the process is still alive we're fine
             if _proc_alive(name):
                 _append_log(
                     name,
@@ -264,18 +261,21 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 )
 
-# Publisher settings routes (read/write youtube_shorts_publisher/settings.py)
+# ─────────────────────────────────────────────
+# Routers
+# ─────────────────────────────────────────────
+
 from publisher_routes import router as publisher_router
 app.include_router(publisher_router, prefix="/launcher")
 
 from subtitler_routes import router as subtitler_router
 app.include_router(subtitler_router, prefix="/launcher")
 
-# Add the Backtrack router here:
 from backtrack_routes import router as backtrack_router
 app.include_router(backtrack_router, prefix="/launcher")
 
-
+from pipeline_routes import router as pipeline_router
+app.include_router(pipeline_router, prefix="/launcher")
 
 # ─────────────────────────────────────────────
 # Routes

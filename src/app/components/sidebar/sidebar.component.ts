@@ -18,6 +18,14 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         <span class="nav-label">Home</span>
       </a>
 
+      <a routerLink="/auto-run"
+         routerLinkActive="active"
+         class="nav-item nav-item--autorun"
+         title="Auto-Run Pipeline">
+        <span class="nav-icon">⚡</span>
+        <span class="nav-label">Auto</span>
+      </a>
+
       <a routerLink="/backtrack"
          routerLinkActive="active"
          class="nav-item"

@@ -1,0 +1,197 @@
+<div class="page-container">
+
+  <!-- ── Header ── -->
+  <div class="page-header">
+    <div class="header-left">
+      <a routerLink="/" class="back-btn"><span>←</span><span>Hub</span></a>
+      <div class="title-block">
+        <h1 class="page-title"><span class="ar-icon">⚡</span> Auto-Run</h1>
+        <span class="sub-label">Automated Backtrack scan → SimpleAutoSubs pipeline</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="status-strip" [style.--sc]="isRunning() ? '#fbbf24' : '#4b5563'">
+        @if (isRunning()) { <span class="strip-spinner"></span> }
+        @else { <span>○</span> }
+        <span>{{ isRunning() ? stepMeta().label : 'Idle' }}</span>
+        @if (status()?.history_count) {
+          <span class="strip-pid">{{ status()!.history_count }} processed all-time</span>
+        }
+      </div>
+      <span class="last-upd">{{ lastUpdated() }}</span>
+    </div>
+  </div>
+
+  @if (!launcherOnline()) {
+    <div class="banner-warn">⚠ Launcher offline — start it with <code>npm start</code></div>
+  }
+
+  <div class="page-panels">
+
+    <!-- ── Left panel ── -->
+    <div class="left-panel">
+
+      <!-- Big run button -->
+      <section class="section run-section">
+        <button
+          class="run-btn"
+          [class.run-btn--active]="isRunning()"
+          [disabled]="!launcherOnline() || actionPending()"
+          (click)="togglePipeline()">
+          @if (actionPending()) {
+            <span class="run-btn-spin"></span>
+          } @else if (isRunning()) {
+            <span class="run-btn-icon">⏹</span>
+          } @else {
+            <span class="run-btn-icon">⚡</span>
+          }
+          <span class="run-btn-label">{{ isRunning() ? 'Stop Auto-Run' : 'Start Auto-Run' }}</span>
+        </button>
+
+        @if (isRunning() && nextScanLabel()) {
+          <div class="next-scan-pill">
+            <span class="next-scan-dot"></span>
+            Next scan in {{ nextScanLabel() }}
+          </div>
+        }
+        @if (status()?.last_run_at) {
+          <span class="last-run-label">Last run: {{ status()!.last_run_at }} — {{ status()!.last_run_files }} file(s) processed</span>
+        }
+      </section>
+
+      <!-- Pipeline steps -->
+      <section class="section steps-section">
+        <h2 class="section-title">Pipeline Steps</h2>
+        <div class="steps-list">
+          @for (step of steps; track step.id) {
+            <div class="step-row" [attr.data-status]="stepStatus(step.id)">
+              <div class="step-indicator">
+                @if (stepStatus(step.id) === 'active') {
+                  <span class="step-spinner"></span>
+                } @else if (stepStatus(step.id) === 'done') {
+                  <span class="step-check">✓</span>
+                } @else {
+                  <span class="step-dot"></span>
+                }
+              </div>
+              <div class="step-info">
+                <span class="step-icon">{{ step.icon }}</span>
+                <span class="step-label">{{ step.label }}</span>
+              </div>
+              @if (stepStatus(step.id) === 'active') {
+                <span class="step-status-label">{{ status()?.step_label }}</span>
+              }
+            </div>
+          }
+        </div>
+      </section>
+
+      <!-- Errors -->
+      @if (errors().length > 0) {
+        <section class="section errors-section">
+          <h2 class="section-title">⚠ Errors This Cycle</h2>
+          @for (err of errors(); track $index) {
+            <div class="error-item">{{ err }}</div>
+          }
+        </section>
+      }
+
+      <!-- Settings -->
+      <section class="section settings-section">
+        <h2 class="section-title">Settings</h2>
+        <div class="setting-row setting-row--full">
+          <div class="setting-info">
+            <span class="setting-name">Backtrack Destination Directory</span>
+            <span class="setting-desc">Local folder where copied Backtrack recordings are stored</span>
+          </div>
+          <div class="dir-input-group">
+            <input
+              class="dir-input"
+              type="text"
+              placeholder="/path/to/todoshorts"
+              [ngModel]="destDir()"
+              (ngModelChange)="destDir.set($event)">
+            <button class="btn btn-save" [disabled]="saving()" (click)="saveSettings()">
+              @if (saving()) { <span class="btn-spin"></span> }
+              @else if (saveDone()) { ✓ }
+              @else { 💾 }
+            </button>
+          </div>
+        </div>
+        <div class="settings-note">
+          Max <strong>3 files</strong> queued per cycle · Deduplication via pipeline history · Hourly scans while running
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ── Right panel ── -->
+    <div class="right-panel">
+
+      <!-- Log panel -->
+      <div class="log-section" style="flex: 1; min-height: 0;">
+        <div class="log-header">
+          <div class="log-header-left">
+            <h2 class="section-title" style="margin:0">Pipeline Log</h2>
+            @if (isRunning()) { <span class="live-badge live-badge--amber">● live</span> }
+          </div>
+          <div class="log-header-right">
+            <button class="log-btn" (click)="poll()">↻</button>
+            <button class="log-btn log-btn--clear" (click)="clearLogs()">✕</button>
+          </div>
+        </div>
+        <div class="log-body">
+          @for (line of logs(); track $index) {
+            <div class="log-line"
+              [class.err]="isErr(line)"
+              [class.ok]="isOk(line)"
+              [class.warn]="isWarn(line)"
+              [class.step]="isStep(line)">{{ line }}</div>
+          }
+          @if (!logs().length) {
+            <div class="log-empty">No output yet. Press Start Auto-Run to begin.</div>
+          }
+        </div>
+      </div>
+
+      <!-- Recent runs -->
+      <div class="runs-panel">
+        <div class="runs-header">
+          <span class="runs-title">Recent Runs</span>
+          <span class="runs-count">{{ runs().length }} recorded</span>
+        </div>
+        <div class="runs-list">
+          @for (run of runs(); track run.timestamp) {
+            <div class="run-row" [class.run-row--error]="run.errors.length > 0">
+              <div class="run-meta">
+                <span class="run-ts">{{ run.timestamp }}</span>
+                <span class="run-dur">{{ formatDuration(run.duration_s) }}</span>
+              </div>
+              <div class="run-stats">
+                @if (run.files_processed > 0) {
+                  <span class="run-pill run-pill--done">{{ run.files_processed }} processed</span>
+                } @else {
+                  <span class="run-pill run-pill--none">0 new files</span>
+                }
+                @if (run.errors.length > 0) {
+                  <span class="run-pill run-pill--err">{{ run.errors.length }} error(s)</span>
+                }
+              </div>
+              @if (run.errors.length > 0) {
+                <div class="run-errors">
+                  @for (e of run.errors; track $index) {
+                    <span class="run-error-text">⚠ {{ e }}</span>
+                  }
+                </div>
+              }
+            </div>
+          }
+          @if (!runs().length) {
+            <div class="runs-empty">No runs yet. Start Auto-Run to begin.</div>
+          }
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
