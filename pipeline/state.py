@@ -45,17 +45,21 @@ runs:    list = []   # recent run records, newest first (max 20)
 
 
 def load_history() -> None:
-    global history
+    """
+    Load history from disk into the existing dict object IN-PLACE.
+    Must not rebind the `history` name — other modules imported it as a
+    direct reference to this dict, so reassignment would leave them pointing
+    at the old empty object.
+    """
+    history.clear()
     if os.path.exists(HISTORY_FILE):
         try:
             with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-                history = json.load(f)
+                history.update(json.load(f))
             log(f"📋 Loaded pipeline history: {len(history)} entries")
         except Exception as e:
             log(f"⚠️ Could not load history: {e}")
-            history = {}
     else:
-        history = {}
         log("📋 No pipeline history found — starting fresh")
 
 

@@ -6,7 +6,7 @@ import { PollingComponent } from '../../shared/polling.component';
 
 interface PipelineStatus {
   running: boolean;
-  step: 'idle' | 'scanning' | 'processing' | 'waiting' | 'error';
+  step: 'idle' | 'scanning' | 'processing' | 'uploading' | 'checking' | 'scraping' | 'analyzing' | 'publishing' | 'waiting' | 'error';
   step_label: string;
   next_scan_in: number | null;  // seconds
   last_run_at: string | null;
@@ -58,6 +58,11 @@ export class AutoRunPageComponent extends PollingComponent {
       idle:       { label: 'Idle',       color: '#4b5563', icon: '○' },
       scanning:   { label: 'Scanning',   color: '#fbbf24', icon: '◌' },
       processing: { label: 'Processing', color: '#60a5fa', icon: '◌' },
+      uploading:  { label: 'Uploading',  color: '#f97316', icon: '◌' },
+      checking:   { label: 'Cleaning up',color: '#06b6d4', icon: '◌' },
+      scraping:   { label: 'Scraping',   color: '#fbbf24', icon: '◌' },
+      analyzing:  { label: 'Analyzing',  color: '#a78bfa', icon: '◌' },
+      publishing: { label: 'Publishing', color: '#34d399', icon: '◌' },
       waiting:    { label: 'Waiting',    color: '#a855f7', icon: '◌' },
       error:      { label: 'Error',      color: '#ef4444', icon: '⚠' },
     };
@@ -73,18 +78,26 @@ export class AutoRunPageComponent extends PollingComponent {
   });
 
   steps = [
-    { id: 'scanning',   label: 'Backtrack Scan',   icon: '🔍' },
-    { id: 'processing', label: 'SimpleAutoSubs',    icon: '💬' },
+    { id: 'scanning',   label: 'Backtrack Scan',    icon: '🔍' },
+    { id: 'processing', label: 'SimpleAutoSubs',     icon: '💬' },
+    { id: 'uploading',  label: 'YouTube Uploader',   icon: '▶'  },
+    { id: 'checking',   label: 'Check & Cleanup',    icon: '🗑'  },
+    { id: 'scraping',   label: 'Scraper',            icon: '🕷'  },
+    { id: 'analyzing',  label: 'AI Analysis',        icon: '🤖' },
+    { id: 'publishing', label: 'Publish Batch',      icon: '📤' },
   ];
+
+  // Step order for marking prior steps as done
+  private readonly _stepOrder = ['scanning', 'processing', 'uploading', 'checking', 'scraping', 'analyzing', 'publishing', 'waiting'];
 
   stepStatus(id: string): 'active' | 'done' | 'waiting' | 'idle' {
     const step = this.currentStep();
     const running = this.isRunning();
     if (!running) return 'idle';
     if (step === id) return 'active';
-    // scanning comes before processing
-    if (id === 'scanning' && step === 'processing') return 'done';
-    if (id === 'scanning' && step === 'waiting')    return 'done';
+    const currentIdx = this._stepOrder.indexOf(step);
+    const thisIdx    = this._stepOrder.indexOf(id);
+    if (thisIdx < currentIdx) return 'done';
     return 'waiting';
   }
 

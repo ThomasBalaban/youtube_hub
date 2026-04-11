@@ -10,6 +10,7 @@ import subprocess
 import sys
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from service_defs import conda_python
 
 router = APIRouter(prefix="/publisher")
 
@@ -207,7 +208,7 @@ def run_check_unuploaded():
         raise HTTPException(404, f"Script not found: {script}")
     try:
         result = subprocess.run(
-            [sys.executable, "-u", script],
+            [conda_python("publisher"), "-u", script],
             cwd=PUBLISHER_DIR,
             capture_output=True,
             text=True,

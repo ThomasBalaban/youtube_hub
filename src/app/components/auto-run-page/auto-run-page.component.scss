@@ -1,3 +1,7 @@
+// ── Step colour overrides ─────────────────────────────────────────────────────
+.step-row[data-status="active"][data-step="uploading"] .step-spinner { border-top-color: #f97316; }
+.step-row[data-status="active"][data-step="checking"]  .step-spinner { border-top-color: #06b6d4; }
+
 :host {
   display: flex;
   flex-direction: column;

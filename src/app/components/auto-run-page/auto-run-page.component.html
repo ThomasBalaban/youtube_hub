@@ -64,7 +64,7 @@
         <h2 class="section-title">Pipeline Steps</h2>
         <div class="steps-list">
           @for (step of steps; track step.id) {
-            <div class="step-row" [attr.data-status]="stepStatus(step.id)">
+            <div class="step-row" [attr.data-status]="stepStatus(step.id)" [attr.data-step]="step.id">
               <div class="step-indicator">
                 @if (stepStatus(step.id) === 'active') {
                   <span class="step-spinner"></span>
@@ -119,7 +119,7 @@
           </div>
         </div>
         <div class="settings-note">
-          Max <strong>3 files</strong> queued per cycle · Deduplication via pipeline history · Hourly scans while running
+          Max <strong>3 files</strong> per batch · Drains backlog before uploading · Upload + cleanup only when backlog is clear · Hourly cycle
         </div>
       </section>
 
