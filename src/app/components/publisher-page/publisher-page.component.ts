@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { PollingComponent } from '../../shared/polling.component';
 
-export type RunMode = 'analysis' | 'scraping' | 'publisher_single' | 'publisher_batch' | 'uploader' | 'check_unuploaded';
+export type RunMode = 'analysis' | 'scraping' | 'publisher_batch' | 'uploader' | 'check_unuploaded';
 
 export interface PublisherSettings {
   PROCESS_SINGLE_VIDEO: boolean;
@@ -63,7 +63,6 @@ interface BacktrackVideoEntry {
 const MODE_META: Record<RunMode, { label: string; icon: string; desc: string; color: string }> = {
   analysis:         { label: 'AI Analysis',     icon: '🤖', desc: 'Download drafts & analyze with Gemini',        color: '#a78bfa' },
   scraping:         { label: 'Scraper',          icon: '🕷',  desc: 'Scan & export draft/scheduled data to JSON',  color: '#fbbf24' },
-  publisher_single: { label: 'Publish One',      icon: '▶',  desc: 'Process a single draft from analysis results', color: '#4ade80' },
   publisher_batch:  { label: 'Publish Batch',    icon: '⚡', desc: 'Process multiple drafts up to the set limit',  color: '#f87171' },
   uploader:         { label: 'Uploader',         icon: '📤', desc: 'Upload processed videos from output folder',   color: '#60a5fa' },
   check_unuploaded: { label: 'Check Unuploaded', icon: '🔍', desc: 'Audit output folder against upload log',       color: '#34d399' },
@@ -73,8 +72,7 @@ function settingsToMode(s: PublisherSettings): RunMode {
   if (s.ENABLE_ANALYSIS_MODE) return 'analysis';
   if (s.ENABLE_SCRAPING_MODE) return 'scraping';
   if (s.ENABLE_UPLOAD_MODE)   return 'uploader';
-  if (s.PROCESS_SINGLE_VIDEO) return 'publisher_single';
-  return 'publisher_batch';
+  return 'publisher_batch'; // PROCESS_SINGLE_VIDEO=true OR all false → batch
 }
 
 function modeToFlags(mode: RunMode) {
@@ -82,7 +80,9 @@ function modeToFlags(mode: RunMode) {
     ENABLE_ANALYSIS_MODE: mode === 'analysis',
     ENABLE_SCRAPING_MODE: mode === 'scraping',
     ENABLE_UPLOAD_MODE:   mode === 'uploader',
-    PROCESS_SINGLE_VIDEO: mode === 'publisher_single',
+    // PROCESS_SINGLE_VIDEO is the flag main.py checks to call run_publisher().
+    // VIDEOS_TO_PROCESS_COUNT controls how many are processed.
+    PROCESS_SINGLE_VIDEO: mode === 'publisher_batch',
   };
 }
 
@@ -97,7 +97,7 @@ export class PublisherPageComponent extends PollingComponent {
   protected override pollingInterval = 4000;
 
   readonly MODE_META = MODE_META;
-  readonly modes: RunMode[] = ['analysis', 'scraping', 'publisher_single', 'publisher_batch', 'uploader', 'check_unuploaded'];
+  readonly modes: RunMode[] = ['analysis', 'scraping', 'publisher_batch', 'uploader', 'check_unuploaded'];
   readonly Math = Math;
 
   // ── Publisher controls ────────────────────────────────────────────────────
@@ -220,8 +220,6 @@ export class PublisherPageComponent extends PollingComponent {
       this.loading.set(false);
     }
 
-    // Only sync logs from the service when check_unuploaded isn't running
-    // (to avoid clobbering audit output mid-display)
     if (!this.checkPending()) {
       await this.refreshLogs();
     }
@@ -286,11 +284,18 @@ export class PublisherPageComponent extends PollingComponent {
       VIDEOS_TO_PROCESS_COUNT: this.videoCount(),
     };
     try {
-      const res = await fetch('/launcher/publisher/settings', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const [settingsRes, timesRes] = await Promise.all([
+        fetch('/launcher/publisher/settings', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }),
+        fetch('/launcher/publisher/schedule-times', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ times: this.scheduleTimes() }),
+        }),
+      ]);
+      if (!settingsRes.ok) throw new Error(`Settings save failed: HTTP ${settingsRes.status}`);
+      if (!timesRes.ok) throw new Error(`Schedule times save failed: HTTP ${timesRes.status}`);
       this.saveDone.set(true);
       setTimeout(() => this.saveDone.set(false), 2000);
     } catch (e: any) {
