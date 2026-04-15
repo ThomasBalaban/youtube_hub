@@ -1,5 +1,5 @@
 {
-  "/launcher": { "target": "http://localhost:8010", "secure": false },
+  "/launcher": { "target": "http://localhost:8011", "secure": false },
   "/subtitler": {
     "target": "http://localhost:8020",
     "secure": false,
