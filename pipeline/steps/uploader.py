@@ -1,18 +1,12 @@
-"""
-Pipeline step 3: YouTube Shorts Uploader.
-Sets ENABLE_UPLOAD_MODE in publisher settings, starts the youtube_publisher
-service, and waits for it to finish (run-and-exit like the scanner).
-"""
-
 import asyncio
 import httpx
 
-from pipeline.state import state, log
+from pipeline.state  import state, log
+from pipeline.config import LAUNCHER_BASE
 
-LAUNCHER_BASE = "http://localhost:8010"
-
-# Publisher can take a long time uploading batches through a browser
 UPLOAD_TIMEOUT_MINUTES = 120
+
+DONE_MARKERS = ["[Uploader] All done.", "No action selected", "Could not navigate"]
 
 
 async def run_uploader(client: httpx.AsyncClient) -> bool:
@@ -23,25 +17,22 @@ async def run_uploader(client: httpx.AsyncClient) -> bool:
     state["step_label"] = "Uploading processed videos to YouTube..."
 
     try:
-        # ── Set publisher to uploader mode ────────────────────────────────────
         log("▶ Setting publisher to Uploader mode...")
-        settings_payload = {
-            "PROCESS_SINGLE_VIDEO": False,
-            "ENABLE_SCRAPING_MODE": False,
-            "ENABLE_ANALYSIS_MODE": False,
-            "ENABLE_UPLOAD_MODE":   True,
-            "VIDEOS_TO_PROCESS_COUNT": 50,
-        }
         r = await client.post(
             f"{LAUNCHER_BASE}/launcher/publisher/settings",
-            json=settings_payload,
+            json={
+                "PROCESS_SINGLE_VIDEO": False,
+                "ENABLE_SCRAPING_MODE": False,
+                "ENABLE_ANALYSIS_MODE": False,
+                "ENABLE_UPLOAD_MODE":   True,
+                "VIDEOS_TO_PROCESS_COUNT": 50,
+            },
         )
         if not r.is_success:
             log(f"❌ Could not set publisher settings (HTTP {r.status_code})")
             return False
         log("✅ Publisher set to Uploader mode")
 
-        # ── Start the publisher service ───────────────────────────────────────
         log("▶ Starting YouTube Publisher...")
         r = await client.post(
             f"{LAUNCHER_BASE}/launcher/services/youtube_publisher/start"
@@ -53,17 +44,11 @@ async def run_uploader(client: httpx.AsyncClient) -> bool:
         log("✅ Publisher started — waiting for it to finish...")
         await asyncio.sleep(5)
 
-        # ── Poll logs for completion marker, then stop the service ────────────
-        # The publisher keeps the browser open after finishing (designed for manual use),
-        # so it never goes offline on its own. We watch stdout for the done marker
-        # and stop it ourselves.
-        DONE_MARKERS = ["[Uploader] All done.", "No action selected", "Could not navigate"]
         log_cursor = 0
-        max_checks = UPLOAD_TIMEOUT_MINUTES * 6   # 10s each
+        max_checks = UPLOAD_TIMEOUT_MINUTES * 6
         for check in range(max_checks):
             await asyncio.sleep(10)
             try:
-                # Check stdout logs for the completion string
                 lr = await client.get(
                     f"{LAUNCHER_BASE}/launcher/services/youtube_publisher/logs?last=500",
                     timeout=10.0,
@@ -75,7 +60,6 @@ async def run_uploader(client: httpx.AsyncClient) -> bool:
                         log(f"  [PUB] {line}")
                     log_cursor = len(all_lines)
 
-                    # Check if any done marker appears in the latest lines
                     if any(marker in line for line in new_lines for marker in DONE_MARKERS):
                         log("✅ Uploader finished — stopping publisher service...")
                         await client.post(
@@ -84,7 +68,6 @@ async def run_uploader(client: httpx.AsyncClient) -> bool:
                         await asyncio.sleep(2)
                         return True
 
-                # Also accept if it exited naturally
                 r2 = await client.get(f"{LAUNCHER_BASE}/launcher/services")
                 if r2.is_success:
                     svcs   = r2.json()

@@ -1,14 +1,8 @@
-"""
-Pipeline step 1: Backtrack Scanner.
-Triggers the scanner service via the launcher and waits for it to finish.
-"""
-
 import asyncio
 import httpx
 
-from pipeline.state import state, log
-
-LAUNCHER_BASE = "http://localhost:8010"
+from pipeline.state  import state, log
+from pipeline.config import LAUNCHER_BASE
 
 
 async def run_scanner(client: httpx.AsyncClient) -> bool:
@@ -29,7 +23,6 @@ async def run_scanner(client: httpx.AsyncClient) -> bool:
         log("✅ Scanner started — waiting for it to finish...")
         await asyncio.sleep(3)
 
-        # Poll up to 3 minutes — scanner is run-and-exit, so we wait for "offline"
         for _ in range(60):
             await asyncio.sleep(3)
             r2 = await client.get(f"{LAUNCHER_BASE}/launcher/services")

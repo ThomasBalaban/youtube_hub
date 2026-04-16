@@ -4,7 +4,7 @@ YouTube Hub Launcher — Process Manager
 Lives in youtube_hub/ and manages sibling services.
 Started automatically by `npm start` — you never need to run this manually.
 
-Port: 8010 (configurable via .env LAUNCHER_PORT)
+Port: 9010 (configurable via .env LAUNCHER_PORT)
 
 Health check strategy:
   - "process" — just checks if the PID is still alive (default for GUI/headless apps)
@@ -32,7 +32,10 @@ load_dotenv()
 
 from service_defs import SERVICE_DEFS, BOOT_RETRIES, THIS_DIR
 
-LAUNCHER_PORT = int(os.environ.get("LAUNCHER_PORT", 8010))
+LAUNCHER_PORT = int(os.environ.get("LAUNCHER_PORT", 9010))
+# Write back so every submodule (pipeline, etc.) reads the correct port
+# regardless of how this process was spawned.
+os.environ["LAUNCHER_PORT"] = str(LAUNCHER_PORT)
 
 # ─────────────────────────────────────────────
 # Runtime state

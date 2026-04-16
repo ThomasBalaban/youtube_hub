@@ -4,7 +4,7 @@
   "scripts": {
     "ng": "ng",
     "start": "bash -c 'trap \"kill 0\" EXIT INT TERM; concurrently --kill-others --kill-others-on-fail --names \"ng,launcher\" --prefix-colors \"cyan,magenta\" \"BROWSER=firefox ng serve --port 4201 --open\" \"python launcher.py\" & wait'",
-    "start:launcher": "LAUNCHER_PORT=8011 python launcher.py",
+    "start:launcher": "LAUNCHER_PORT=9011 python launcher.py",
     "build": "ng build"
   },
   "private": true,

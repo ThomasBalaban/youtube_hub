@@ -1,7 +1,7 @@
 {
-  "/launcher": { "target": "http://localhost:8011", "secure": false },
+  "/launcher": { "target": "http://localhost:9011", "secure": false },
   "/subtitler": {
-    "target": "http://localhost:8020",
+    "target": "http://localhost:9020",
     "secure": false,
     "pathRewrite": { "^/subtitler": "" }
   }

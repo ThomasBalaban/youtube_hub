@@ -1,17 +1,11 @@
-"""
-Pipeline step 5: Scraper.
-Sets ENABLE_SCRAPING_MODE, starts the publisher service, watches stdout
-for the completion marker, then stops the service.
-"""
-
 import asyncio
 import httpx
 
-from pipeline.state import state, log
+from pipeline.state  import state, log
+from pipeline.config import LAUNCHER_BASE
 
-LAUNCHER_BASE   = "http://localhost:8010"
-DONE_MARKERS    = ["Scrape Complete.", "No action selected", "Could not navigate"]
-ERROR_MARKERS   = ["CRITICAL:", "Navigation failed"]
+DONE_MARKERS  = ["Scrape Complete.", "No action selected", "Could not navigate"]
+ERROR_MARKERS = ["CRITICAL:", "Navigation failed"]
 
 
 async def run_scraper(client: httpx.AsyncClient) -> bool:
@@ -22,7 +16,6 @@ async def run_scraper(client: httpx.AsyncClient) -> bool:
     state["step_label"] = "Scraping YouTube Studio for draft/scheduled data..."
 
     try:
-        # ── Set scraper mode ──────────────────────────────────────────────────
         r = await client.post(
             f"{LAUNCHER_BASE}/launcher/publisher/settings",
             json={
@@ -38,7 +31,6 @@ async def run_scraper(client: httpx.AsyncClient) -> bool:
             return False
         log("✅ Publisher set to Scraper mode")
 
-        # ── Start publisher ───────────────────────────────────────────────────
         r = await client.post(
             f"{LAUNCHER_BASE}/launcher/services/youtube_publisher/start"
         )
@@ -50,10 +42,8 @@ async def run_scraper(client: httpx.AsyncClient) -> bool:
         await asyncio.sleep(5)
 
         log_cursor = 0
-        check = 0
-        while True:  # run until done marker, error, or user stops
+        while True:
             await asyncio.sleep(10)
-            check += 1
             if not state["running"]:
                 await client.post(f"{LAUNCHER_BASE}/launcher/services/youtube_publisher/stop")
                 return False
@@ -84,7 +74,6 @@ async def run_scraper(client: httpx.AsyncClient) -> bool:
                         )
                         return False
 
-                # Natural exit fallback
                 r2 = await client.get(f"{LAUNCHER_BASE}/launcher/services")
                 if r2.is_success:
                     svcs = r2.json()
@@ -95,10 +84,6 @@ async def run_scraper(client: httpx.AsyncClient) -> bool:
 
             except Exception as e:
                 log(f"   ⚠️ Poll error: {e} — retrying...")
-
-        log("⚠️ Scraper loop exited unexpectedly")
-        await client.post(f"{LAUNCHER_BASE}/launcher/services/youtube_publisher/stop")
-        return False
 
     except Exception as e:
         log(f"❌ Scraper step error: {e}")

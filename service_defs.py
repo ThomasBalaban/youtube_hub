@@ -57,7 +57,11 @@ def conda_python(env_name: str) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Add new projects here.
+# Port assignments (all in 9000s range)
+#
+#   9010  — YouTube Hub Launcher (default, direct run)
+#   9011  — YouTube Hub Launcher (external UI / start:launcher)
+#   9020  — SimpleAutoSubs API
 #
 # health_check options:
 #   "process" — just checks if the PID is alive (use for GUI/desktop apps)
@@ -84,9 +88,9 @@ SERVICE_DEFS: Dict[str, Dict[str, Any]] = {
         "description":  "Headless REST API for the Hub to queue videos, change settings, and run subtitle processing without the GUI",
         "cmd":          [conda_python("simpleautosubs"), "-u", "api_server.py"],
         "cwd":          os.path.join(PARENT_DIR, "SimpleAutoSubs"),
-        "port":         8020,
+        "port":         9020,
         "health_check": "http",
-        "health_url":   "http://localhost:8020/health",
+        "health_url":   "http://localhost:9020/health",
         "managed":      True,
         "is_gui":       False,
         "color_hint":   "#34d399",     # emerald
@@ -100,7 +104,7 @@ SERVICE_DEFS: Dict[str, Dict[str, Any]] = {
         "health_check": "process",
         "managed":      True,
         "is_gui":       True,
-        "color_hint":   "#f87171", 
+        "color_hint":   "#f87171",
     },
     "backtrack_scanner": {
         "label":        "Backtrack Scanner",

@@ -1,15 +1,7 @@
-"""
-Pipeline step 4: Check Unuploaded.
-Calls the existing launcher endpoint which runs check_unuploaded.py as a
-subprocess. That script audits the output folder against uploaded_files.json
-and sends confirmed-uploaded files to the Trash automatically.
-"""
-
 import httpx
 
-from pipeline.state import state, log
-
-LAUNCHER_BASE = "http://localhost:8010"
+from pipeline.state  import state, log
+from pipeline.config import LAUNCHER_BASE
 
 
 async def run_check_unuploaded(client: httpx.AsyncClient) -> bool:
@@ -21,9 +13,6 @@ async def run_check_unuploaded(client: httpx.AsyncClient) -> bool:
 
     try:
         log("▶ Running check_unuploaded script...")
-        # This endpoint runs the script synchronously and returns stdout.
-        # Timeout is generous — the script itself is fast but we give 2 minutes
-        # in case the folder is large.
         r = await client.post(
             f"{LAUNCHER_BASE}/launcher/publisher/check-unuploaded",
             timeout=120.0,
@@ -36,7 +25,6 @@ async def run_check_unuploaded(client: httpx.AsyncClient) -> bool:
         data   = r.json()
         output = data.get("output", "(no output)").strip()
 
-        # Forward each line into the pipeline log
         for line in output.splitlines():
             log(f"  [CU] {line}")
 

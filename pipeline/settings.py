@@ -7,9 +7,9 @@ import os
 
 from pipeline.state import history, log, save_history
 
-THIS_DIR         = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+THIS_DIR          = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HUB_SETTINGS_FILE = os.path.join(THIS_DIR, "hub_settings.json")
-BACKTRACK_DIR    = os.path.join(os.path.dirname(THIS_DIR), "backtrack_scanner")
+BACKTRACK_DIR     = os.path.join(os.path.dirname(THIS_DIR), "backtrack_scanner")
 
 MAX_FILES_PER_RUN = 3
 
@@ -37,12 +37,23 @@ def write_hub_settings(patch: dict) -> None:
 
 def read_inventory() -> dict:
     inv_path = os.path.join(BACKTRACK_DIR, "copied_inventory.json")
+
     if not os.path.exists(inv_path):
         log("⚠️ copied_inventory.json not found")
         return {}
+
     try:
+        # Guard against empty file (e.g. scanner wrote it mid-run or it got corrupted)
+        if os.path.getsize(inv_path) == 0:
+            log("⚠️ copied_inventory.json is empty — skipping")
+            return {}
+
         with open(inv_path, "r", encoding="utf-8") as f:
             return json.load(f)
+
+    except json.JSONDecodeError as e:
+        log(f"⚠️ copied_inventory.json is not valid JSON — skipping ({e})")
+        return {}
     except Exception as e:
         log(f"⚠️ Could not read inventory: {e}")
         return {}
@@ -72,7 +83,7 @@ def get_new_files() -> list:
             history[filename] = "deleted"
             save_history()
 
-    new_files.sort(key=lambda x: x[0])   # deterministic order via timestamp in name
+    new_files.sort(key=lambda x: x[0])
     selected = new_files[:MAX_FILES_PER_RUN]
 
     if new_files:

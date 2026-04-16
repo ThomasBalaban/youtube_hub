@@ -1,176 +1,95 @@
 """
-FastAPI router for reading/writing youtube_shorts_publisher settings
-and reading its output data files.
+FastAPI router for the Auto-Run pipeline.
+Orchestrates: Backtrack Scan → SimpleAutoSubs processing on a 1-hour loop.
+
+NOTE: This is the legacy standalone version of the pipeline router.
+      The active version used by launcher.py is pipeline/routes.py.
+      Kept here for reference — ports updated to match the 9000s range.
 """
 
-import re
-import os
+import asyncio
 import json
-import subprocess
-import sys
-from fastapi import APIRouter, HTTPException
+import os
+import time
+from collections import deque
+from typing import Optional
+
+from fastapi import APIRouter
 from pydantic import BaseModel
-from service_defs import conda_python
 
-router = APIRouter(prefix="/publisher")
+router = APIRouter(prefix="/pipeline")
 
-THIS_DIR      = os.path.dirname(os.path.abspath(__file__))
-PARENT_DIR    = os.path.dirname(THIS_DIR)
-PUBLISHER_DIR = os.path.join(PARENT_DIR, "youtube_shorts_publisher")
-SETTINGS_PATH = os.path.join(PUBLISHER_DIR, "settings.py")
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+PARENT_DIR = os.path.dirname(THIS_DIR)
+BACKTRACK_DIR = os.path.join(PARENT_DIR, "backtrack_scanner")
+HISTORY_FILE = os.path.join(THIS_DIR, "pipeline_history.json")
+HUB_SETTINGS_FILE = os.path.join(THIS_DIR, "hub_settings.json")
 
-# ─── Known data files ─────────────────────────────────────────────────────────
+SUBTITLER_BASE = "http://localhost:9020"
+LAUNCHER_BASE  = "http://localhost:9010"
 
-DATA_FILES = {
-    "draft_analysis": {
-        "label":       "Draft Analysis",
-        "description": "AI-generated metadata for each analyzed draft",
-        "path":        "draft_analysis.json",
-    },
-    "failed_shorts": {
-        "label":       "Failed Shorts",
-        "description": "Shorts that errored during analysis or download",
-        "path":        "failed_shorts_data.json",
-    },
-    "backtrack_videos": {
-        "label":       "Backtrack Videos",
-        "description": "Draft + scheduled videos containing 'Backtrack'",
-        "path":        "saved_shorts_data/backtrack_videos.json",
-    },
-    "draft_videos": {
-        "label":       "Draft Videos",
-        "description": "All draft videos found during last scrape",
-        "path":        "saved_shorts_data/draft_videos.json",
-    },
-    "scheduled_videos": {
-        "label":       "Scheduled Videos",
-        "description": "All scheduled videos with publish timestamps",
-        "path":        "saved_shorts_data/scheduled_videos.json",
-    },
+MAX_FILES_PER_RUN = 3
+SCAN_INTERVAL = 300  # 5 minutes
+
+# ── State ─────────────────────────────────────────────────────────────────────
+
+_state: dict = {
+    "running": False,
+    "step": "idle",
+    "step_label": "—",
+    "next_scan_at": None,
+    "last_run_at": None,
+    "last_run_files": 0,
+    "errors": [],
 }
 
+_logs: deque = deque(maxlen=1000)
+_history: dict = {}
+_runs: list = []
+_task: Optional[asyncio.Task] = None
 
-# ─── Settings ─────────────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
-class PublisherSettings(BaseModel):
-    PROCESS_SINGLE_VIDEO: bool
-    ENABLE_SCRAPING_MODE: bool
-    ENABLE_ANALYSIS_MODE: bool
-    ENABLE_UPLOAD_MODE: bool
-    VIDEOS_TO_PROCESS_COUNT: int
+_http_client = None
 
-
-def _read_settings() -> PublisherSettings:
-    if not os.path.exists(SETTINGS_PATH):
-        raise HTTPException(status_code=404, detail=f"settings.py not found at {SETTINGS_PATH}")
-    with open(SETTINGS_PATH, "r") as f:
-        content = f.read()
-
-    def get_bool(name):
-        m = re.search(rf"^{name}\s*=\s*(True|False)", content, re.MULTILINE)
-        return m.group(1) == "True" if m else False
-
-    def get_int(name):
-        m = re.search(rf"^{name}\s*=\s*(\d+)", content, re.MULTILINE)
-        return int(m.group(1)) if m else 0
-
-    return PublisherSettings(
-        PROCESS_SINGLE_VIDEO=get_bool("PROCESS_SINGLE_VIDEO"),
-        ENABLE_SCRAPING_MODE=get_bool("ENABLE_SCRAPING_MODE"),
-        ENABLE_ANALYSIS_MODE=get_bool("ENABLE_ANALYSIS_MODE"),
-        ENABLE_UPLOAD_MODE=get_bool("ENABLE_UPLOAD_MODE"),
-        VIDEOS_TO_PROCESS_COUNT=get_int("VIDEOS_TO_PROCESS_COUNT"),
-    )
+async def _ensure_http_client():
+    global _http_client
+    if _http_client is None:
+        import httpx
+        _http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=10.0, read=None, write=10.0, pool=10.0)
+        )
+    return _http_client
 
 
-def _write_settings(settings: PublisherSettings) -> None:
-    if not os.path.exists(SETTINGS_PATH):
-        raise HTTPException(status_code=404, detail=f"settings.py not found at {SETTINGS_PATH}")
-    with open(SETTINGS_PATH, "r") as f:
-        content = f.read()
-
-    def replace_bool(name, value):
-        nonlocal content
-        content = re.sub(rf"^({name}\s*=\s*)(True|False)", rf"\g<1>{value}", content, flags=re.MULTILINE)
-
-    def replace_int(name, value):
-        nonlocal content
-        content = re.sub(rf"^({name}\s*=\s*)\d+", rf"\g<1>{value}", content, flags=re.MULTILINE)
-
-    replace_bool("PROCESS_SINGLE_VIDEO", settings.PROCESS_SINGLE_VIDEO)
-    replace_bool("ENABLE_SCRAPING_MODE", settings.ENABLE_SCRAPING_MODE)
-    replace_bool("ENABLE_ANALYSIS_MODE", settings.ENABLE_ANALYSIS_MODE)
-    replace_bool("ENABLE_UPLOAD_MODE",   settings.ENABLE_UPLOAD_MODE)
-    replace_int("VIDEOS_TO_PROCESS_COUNT", settings.VIDEOS_TO_PROCESS_COUNT)
-
-    with open(SETTINGS_PATH, "w") as f:
-        f.write(content)
+def _log(msg: str) -> None:
+    line = f"[{time.strftime('%H:%M:%S')}] {msg}"
+    _logs.append(line)
+    print(f"[pipeline] {line}", flush=True)
 
 
-@router.get("/settings")
-def get_settings():
-    return _read_settings()
+def _load_history() -> None:
+    global _history
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                _history = json.load(f)
+            _log(f"📋 Loaded pipeline history: {len(_history)} entries")
+        except Exception as e:
+            _log(f"⚠️ Could not load history: {e}")
+            _history = {}
+    else:
+        _history = {}
+        _log("📋 No pipeline history found — starting fresh")
 
 
-@router.post("/settings")
-def post_settings(settings: PublisherSettings):
-    _write_settings(settings)
-    return {"ok": True}
-
-
-# ─── Data files ────────────────────────────────────────────────────────────────
-
-@router.get("/data/files")
-def list_data_files():
-    result = []
-    for key, defn in DATA_FILES.items():
-        full = os.path.join(PUBLISHER_DIR, defn["path"])
-        exists = os.path.exists(full)
-        result.append({
-            "key":         key,
-            "label":       defn["label"],
-            "description": defn["description"],
-            "path":        defn["path"],
-            "exists":      exists,
-            "size":        os.path.getsize(full) if exists else 0,
-            "modified":    os.path.getmtime(full) if exists else None,
-        })
-    return result
-
-
-@router.get("/data/file")
-def get_data_file(key: str):
-    if key not in DATA_FILES:
-        raise HTTPException(404, f"Unknown file: {key}")
-    full = os.path.join(PUBLISHER_DIR, DATA_FILES[key]["path"])
-    if not os.path.exists(full):
-        raise HTTPException(404, f"File not yet generated: {DATA_FILES[key]['path']}")
+def _save_history() -> None:
     try:
-        with open(full, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return {"key": key, "label": DATA_FILES[key]["label"], "data": data}
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(_history, f, indent=2)
     except Exception as e:
-        raise HTTPException(500, str(e))
+        _log(f"⚠️ Could not save history: {e}")
 
-
-@router.delete("/data/file")
-def delete_data_file(key: str):
-    if key not in DATA_FILES:
-        raise HTTPException(404, f"Unknown file: {key}")
-    full = os.path.join(PUBLISHER_DIR, DATA_FILES[key]["path"])
-    if not os.path.exists(full):
-        raise HTTPException(404, "File not found")
-    os.remove(full)
-    return {"ok": True}
-
-
-# ─── Schedule Times ───────────────────────────────────────────────────────────
-
-HUB_SETTINGS_FILE = os.path.join(THIS_DIR, "hub_settings.json")
-DEFAULT_SCHEDULE_TIMES = ["10:00", "12:00", "16:00", "18:00", "20:00"]
-
-class ScheduleTimesPayload(BaseModel):
-    times: list[str]
 
 def _read_hub_settings() -> dict:
     if os.path.exists(HUB_SETTINGS_FILE):
@@ -181,44 +100,349 @@ def _read_hub_settings() -> dict:
             pass
     return {}
 
+
 def _write_hub_settings(patch: dict) -> None:
     data = _read_hub_settings()
     data.update(patch)
     with open(HUB_SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
-@router.get("/schedule-times")
-def get_schedule_times():
-    d = _read_hub_settings()
-    return {"times": d.get("schedule_times", DEFAULT_SCHEDULE_TIMES)}
 
-@router.post("/schedule-times")
-def post_schedule_times(payload: ScheduleTimesPayload):
-    _write_hub_settings({"schedule_times": sorted(payload.times)})
+def _read_inventory() -> dict:
+    inv_path = os.path.join(BACKTRACK_DIR, "copied_inventory.json")
+    if not os.path.exists(inv_path):
+        _log("⚠️ copied_inventory.json not found")
+        return {}
+    try:
+        with open(inv_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        _log(f"⚠️ Could not read inventory: {e}")
+        return {}
+
+
+def _get_new_files() -> list:
+    inventory = _read_inventory()
+    settings = _read_hub_settings()
+    dest_dir = settings.get("backtrack_dest_dir", "/Users/thomasbalaban/Downloads/todoshorts")
+
+    new_files = []
+    for filename in inventory:
+        if filename not in _history:
+            full_path = os.path.join(dest_dir, filename)
+            if os.path.exists(full_path):
+                new_files.append((filename, full_path))
+            else:
+                _log(f"⚠️ File deleted/missing, marking as handled: {filename}")
+                _history[filename] = "deleted"
+                _save_history()
+
+    new_files.sort(key=lambda x: x[0])
+    selected = new_files[:MAX_FILES_PER_RUN]
+
+    if new_files:
+        _log(f"📂 {len(inventory)} in inventory, {len(new_files)} new, selecting {len(selected)}")
+    return selected
+
+
+# ── Pipeline steps ─────────────────────────────────────────────────────────────
+
+async def _run_scanner(client) -> bool:
+    _log("─" * 40)
+    _log("STEP 1 — Backtrack Scan")
+    _log("─" * 40)
+    _state["step"] = "scanning"
+    _state["step_label"] = "Scanning SMB drive for new recordings..."
+
+    try:
+        r = await client.post(f"{LAUNCHER_BASE}/launcher/services/backtrack_scanner/start")
+        if not r.is_success:
+            _log(f"❌ Could not start scanner (HTTP {r.status_code})")
+            return False
+
+        _log("✅ Scanner started — waiting for it to finish...")
+        await asyncio.sleep(3)
+
+        for _ in range(60):
+            await asyncio.sleep(3)
+            r2 = await client.get(f"{LAUNCHER_BASE}/launcher/services")
+            if r2.is_success:
+                svcs = r2.json()
+                svc = next((s for s in svcs if s["id"] == "backtrack_scanner"), None)
+                if svc and svc["status"] == "offline":
+                    _log("✅ Scanner completed successfully")
+                    return True
+        _log("⚠️ Scanner did not finish within 3 minutes")
+        return False
+
+    except Exception as e:
+        _log(f"❌ Scanner step error: {e}")
+        return False
+
+
+async def _run_subtitler(client, files: list) -> bool:
+    _log("─" * 40)
+    _log("STEP 2 — SimpleAutoSubs Processing")
+    _log("─" * 40)
+    _state["step"] = "processing"
+    _state["step_label"] = f"Processing {len(files)} file(s) through SimpleAutoSubs..."
+
+    paths = [f[1] for f in files]
+
+    _log("Files to process:")
+    for p in paths:
+        _log(f"   • {os.path.basename(p)}")
+
+    try:
+        svc_r = await client.get(f"{LAUNCHER_BASE}/launcher/services")
+        if svc_r.is_success:
+            svcs = svc_r.json()
+            api_svc = next((s for s in svcs if s["id"] == "simple_auto_subs_api"), None)
+            if not api_svc or api_svc["status"] != "online":
+                _log("▶ Starting SimpleAutoSubs API...")
+                await client.post(f"{LAUNCHER_BASE}/launcher/services/simple_auto_subs_api/start")
+                api_ready = False
+                for attempt in range(36):
+                    await asyncio.sleep(5)
+                    r2 = await client.get(f"{LAUNCHER_BASE}/launcher/services")
+                    if r2.is_success:
+                        svcs2 = r2.json()
+                        api2 = next((s for s in svcs2 if s["id"] == "simple_auto_subs_api"), None)
+                        status2 = api2["status"] if api2 else "unknown"
+                        _log(f"   ⏳ Waiting for API... ({status2}) [{attempt+1}/36]")
+                        if api2 and status2 == "online":
+                            _log("✅ SimpleAutoSubs API is online")
+                            api_ready = True
+                            break
+                if not api_ready:
+                    _log("❌ SimpleAutoSubs API failed to start within 3 minutes")
+                    return False
+            else:
+                _log("✅ SimpleAutoSubs API already online")
+
+        r = await client.post(f"{SUBTITLER_BASE}/files", json={"paths": paths})
+        if not r.is_success:
+            _log(f"❌ Failed to queue files (HTTP {r.status_code})")
+            return False
+
+        added = r.json().get("added", 0)
+        _log(f"✅ {added} file(s) queued")
+
+        r = await client.post(f"{SUBTITLER_BASE}/process/start")
+        if not r.is_success:
+            _log(f"❌ Failed to start processing (HTTP {r.status_code})")
+            return False
+
+        _log("▶ Processing started — polling for completion...")
+
+        import httpx as _httpx
+        errors_seen = 0
+        log_cursor = 0
+
+        for _ in range(720):
+            await asyncio.sleep(5)
+
+            try:
+                log_r = await client.get(f"{SUBTITLER_BASE}/logs?last=500", timeout=3.0)
+                if log_r.is_success:
+                    all_lines = log_r.json().get("lines", [])
+                    new_lines = all_lines[log_cursor:]
+                    for line in new_lines:
+                        _log(f"  [SAS] {line}")
+                    log_cursor = len(all_lines)
+            except Exception:
+                pass
+
+            try:
+                r = await client.get(f"{SUBTITLER_BASE}/process/status")
+            except _httpx.ReadTimeout:
+                continue
+            except Exception as poll_err:
+                _log(f"   ⚠️ Poll error: {poll_err} — retrying...")
+                continue
+            if not r.is_success:
+                _log("⚠️ Could not reach subtitler status endpoint")
+                continue
+
+            status = r.json()
+            done = status.get("done", 0)
+            processing = status.get("processing", False)
+            queued_left = status.get("queued", 0)
+            err_count = status.get("errors", 0)
+
+            if err_count > errors_seen:
+                _state["errors"].append(f"{err_count - errors_seen} file(s) errored in SimpleAutoSubs")
+                errors_seen = err_count
+
+            if not processing and queued_left == 0:
+                _log(f"✅ Batch complete — {done} done, {err_count} errors")
+                return True
+
+        _log("⚠️ Processing timed out after 1 hour")
+        return False
+
+    except Exception as e:
+        _log(f"❌ Subtitler step error: {e}")
+        import traceback
+        _log(traceback.format_exc())
+        return False
+
+
+# ── Main loop ─────────────────────────────────────────────────────────────────
+
+async def _pipeline_loop() -> None:
+    _load_history()
+
+    while _state["running"]:
+        _state["errors"] = []
+        run_start = time.time()
+        files_processed = 0
+
+        _log("═" * 50)
+        _log(f"🚀 Auto-Run cycle — {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        _log("═" * 50)
+
+        client = await _ensure_http_client()
+
+        scan_ok = await _run_scanner(client)
+        if not scan_ok:
+            _state["errors"].append("Scanner failed — see log for details")
+
+        drain_failed = False
+        batch_num = 0
+
+        while _state["running"]:
+            new_files = _get_new_files()
+            if not new_files:
+                if batch_num == 0:
+                    _log("ℹ️ No new files to process this cycle")
+                else:
+                    _log(f"✅ Drain complete — {files_processed} file(s) processed")
+                break
+
+            batch_num += 1
+            process_ok = await _run_subtitler(client, new_files)
+
+            if process_ok:
+                ts = time.strftime("%Y-%m-%d %H:%M:%S")
+                for filename, _ in new_files:
+                    _history[filename] = ts
+                _save_history()
+                files_processed += len(new_files)
+            else:
+                _state["errors"].append("SimpleAutoSubs processing failed — see log")
+                drain_failed = True
+                break
+
+        _runs.insert(0, {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "files_in_inventory": len(_read_inventory()),
+            "files_processed": files_processed,
+            "errors": list(_state["errors"]),
+            "duration_s": int(time.time() - run_start),
+        })
+        if len(_runs) > 20:
+            _runs.pop()
+
+        _state["last_run_at"] = time.strftime("%H:%M:%S")
+        _state["last_run_files"] = files_processed
+
+        if not _state["running"]:
+            break
+
+        _state["step"] = "waiting"
+        _state["step_label"] = "Waiting for next scan..."
+        _state["next_scan_at"] = time.time() + SCAN_INTERVAL
+        next_ts = time.strftime("%H:%M:%S", time.localtime(_state["next_scan_at"]))
+        _log(f"💤 Cycle done. Next scan at {next_ts}")
+
+        for _ in range(SCAN_INTERVAL):
+            if not _state["running"]:
+                break
+            await asyncio.sleep(1)
+
+    _state["step"] = "idle"
+    _state["step_label"] = "—"
+    _state["next_scan_at"] = None
+    _log("⏹ Auto-Run stopped")
+
+
+# ── Routes ─────────────────────────────────────────────────────────────────────
+
+class DestDirPayload(BaseModel):
+    backtrack_dest_dir: str
+
+
+@router.post("/start")
+async def start_pipeline():
+    global _task
+    if _state["running"]:
+        return {"ok": False, "reason": "already_running"}
+    _state["running"] = True
+    _state["step"] = "idle"
+    _logs.clear()
+    _state["errors"] = []
+    _task = asyncio.create_task(_pipeline_loop())
     return {"ok": True}
 
 
-# ─── Check Unuploaded ─────────────────────────────────────────────────────────
+@router.post("/stop")
+async def stop_pipeline():
+    global _task, _http_client
+    _state["running"] = False
+    _state["next_scan_at"] = None
+    if _task and not _task.done():
+        _task.cancel()
+    if _http_client:
+        await _http_client.aclose()
+        _http_client = None
+    return {"ok": True}
 
-@router.post("/check-unuploaded")
-def run_check_unuploaded():
-    """Run uploader/check_unuploaded.py as a subprocess and return its stdout."""
-    script = os.path.join(PUBLISHER_DIR, "uploader", "check_unuploaded.py")
-    if not os.path.exists(script):
-        raise HTTPException(404, f"Script not found: {script}")
-    try:
-        result = subprocess.run(
-            [conda_python("publisher"), "-u", script],
-            cwd=PUBLISHER_DIR,
-            capture_output=True,
-            text=True,
-            timeout=60,
+
+@router.get("/status")
+def get_status():
+    next_scan_in = None
+    if _state["next_scan_at"]:
+        next_scan_in = max(0, int(_state["next_scan_at"] - time.time()))
+    return {
+        "running": _state["running"],
+        "step": _state["step"],
+        "step_label": _state["step_label"],
+        "next_scan_in": next_scan_in,
+        "last_run_at": _state["last_run_at"],
+        "last_run_files": _state["last_run_files"],
+        "errors": _state["errors"],
+        "history_count": len(_history),
+    }
+
+
+@router.get("/logs")
+def get_logs(last: int = 300):
+    return {"lines": list(_logs)[-last:]}
+
+
+@router.delete("/logs")
+def clear_logs():
+    _logs.clear()
+    return {"ok": True}
+
+
+@router.get("/runs")
+def get_runs():
+    return {"runs": _runs}
+
+
+@router.get("/settings")
+def get_settings():
+    d = _read_hub_settings()
+    return {
+        "backtrack_dest_dir": d.get(
+            "backtrack_dest_dir", "/Users/thomasbalaban/Downloads/todoshorts"
         )
-        output = result.stdout
-        if result.stderr:
-            output += "\nSTDERR:\n" + result.stderr
-        return {"ok": result.returncode == 0, "output": output.strip()}
-    except subprocess.TimeoutExpired:
-        raise HTTPException(500, "Script timed out after 60s")
-    except Exception as e:
-        raise HTTPException(500, str(e))
+    }
+
+
+@router.post("/settings")
+def post_settings(payload: DestDirPayload):
+    _write_hub_settings({"backtrack_dest_dir": payload.backtrack_dest_dir})
+    return {"ok": True}

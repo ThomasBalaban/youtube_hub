@@ -1,23 +1,13 @@
-"""
-Pipeline step 2: SimpleAutoSubs processing.
-Starts the API if needed, queues files, waits for completion, forwards logs.
-"""
-
 import asyncio
 import httpx
 
-from pipeline.state import state, log
+from pipeline.state  import state, log
+from pipeline.config import LAUNCHER_BASE
 
-LAUNCHER_BASE  = "http://localhost:8010"
-SUBTITLER_BASE = "http://localhost:8020"
+SUBTITLER_BASE = "http://localhost:9020"
 
 
 async def run_subtitler(client: httpx.AsyncClient, files: list) -> bool:
-    """
-    files: list of (filename, full_path) tuples.
-    Returns True when all queued files are done (errors included — they're
-    tracked separately in state["errors"]).
-    """
     log("─" * 40)
     log("STEP 2 — SimpleAutoSubs Processing")
     log("─" * 40)
@@ -32,7 +22,6 @@ async def run_subtitler(client: httpx.AsyncClient, files: list) -> bool:
         log(f"   • {os.path.basename(p)}")
 
     try:
-        # ── Ensure the API is running ─────────────────────────────────────────
         svc_r = await client.get(f"{LAUNCHER_BASE}/launcher/services")
         if svc_r.is_success:
             svcs    = svc_r.json()
@@ -43,7 +32,6 @@ async def run_subtitler(client: httpx.AsyncClient, files: list) -> bool:
                 await client.post(
                     f"{LAUNCHER_BASE}/launcher/services/simple_auto_subs_api/start"
                 )
-                # Poll launcher every 5s for up to 3 minutes
                 api_ready = False
                 for attempt in range(36):
                     await asyncio.sleep(5)
@@ -63,7 +51,6 @@ async def run_subtitler(client: httpx.AsyncClient, files: list) -> bool:
             else:
                 log("✅ SimpleAutoSubs API already online")
 
-        # ── Queue files ───────────────────────────────────────────────────────
         r = await client.post(f"{SUBTITLER_BASE}/files", json={"paths": paths})
         if not r.is_success:
             log(f"❌ Failed to queue files (HTTP {r.status_code})")
@@ -72,7 +59,6 @@ async def run_subtitler(client: httpx.AsyncClient, files: list) -> bool:
         added = r.json().get("added", 0)
         log(f"✅ {added} file(s) queued")
 
-        # ── Start processing ──────────────────────────────────────────────────
         r = await client.post(f"{SUBTITLER_BASE}/process/start")
         if not r.is_success:
             log(f"❌ Failed to start processing (HTTP {r.status_code})")
@@ -81,13 +67,11 @@ async def run_subtitler(client: httpx.AsyncClient, files: list) -> bool:
         log("▶ Processing started — polling for completion...")
 
         errors_seen = 0
-        log_cursor  = 0   # how many SAS log lines have been forwarded so far
+        log_cursor  = 0
 
-        # Poll up to 1 hour (720 × 5s)
         for _ in range(720):
             await asyncio.sleep(5)
 
-            # Forward new SimpleAutoSubs log lines into the pipeline log
             try:
                 log_r = await client.get(
                     f"{SUBTITLER_BASE}/logs?last=500", timeout=3.0
@@ -98,9 +82,8 @@ async def run_subtitler(client: httpx.AsyncClient, files: list) -> bool:
                         log(f"  [SAS] {line}")
                     log_cursor = len(all_lines)
             except Exception:
-                pass   # log forwarding is best-effort
+                pass
 
-            # Check status
             try:
                 r = await client.get(f"{SUBTITLER_BASE}/process/status")
             except httpx.ReadTimeout:
@@ -115,7 +98,6 @@ async def run_subtitler(client: httpx.AsyncClient, files: list) -> bool:
 
             status      = r.json()
             done        = status.get("done", 0)
-            total       = status.get("total", 0)
             processing  = status.get("processing", False)
             queued_left = status.get("queued", 0)
             err_count   = status.get("errors", 0)
