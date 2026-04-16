@@ -2,10 +2,9 @@ import asyncio
 import httpx
 
 from pipeline.state  import state, log
-from pipeline.config import LAUNCHER_BASE
+from pipeline.config import get_launcher_base
 
 UPLOAD_TIMEOUT_MINUTES = 120
-
 DONE_MARKERS = ["[Uploader] All done.", "No action selected", "Could not navigate"]
 
 
@@ -16,10 +15,12 @@ async def run_uploader(client: httpx.AsyncClient) -> bool:
     state["step"]       = "uploading"
     state["step_label"] = "Uploading processed videos to YouTube..."
 
+    launcher_base = get_launcher_base()
+
     try:
         log("▶ Setting publisher to Uploader mode...")
         r = await client.post(
-            f"{LAUNCHER_BASE}/launcher/publisher/settings",
+            f"{launcher_base}/launcher/publisher/settings",
             json={
                 "PROCESS_SINGLE_VIDEO": False,
                 "ENABLE_SCRAPING_MODE": False,
@@ -34,9 +35,7 @@ async def run_uploader(client: httpx.AsyncClient) -> bool:
         log("✅ Publisher set to Uploader mode")
 
         log("▶ Starting YouTube Publisher...")
-        r = await client.post(
-            f"{LAUNCHER_BASE}/launcher/services/youtube_publisher/start"
-        )
+        r = await client.post(f"{launcher_base}/launcher/services/youtube_publisher/start")
         if not r.is_success:
             log(f"❌ Could not start publisher (HTTP {r.status_code})")
             return False
@@ -50,7 +49,7 @@ async def run_uploader(client: httpx.AsyncClient) -> bool:
             await asyncio.sleep(10)
             try:
                 lr = await client.get(
-                    f"{LAUNCHER_BASE}/launcher/services/youtube_publisher/logs?last=500",
+                    f"{launcher_base}/launcher/services/youtube_publisher/logs?last=500",
                     timeout=10.0,
                 )
                 if lr.is_success:
@@ -62,13 +61,11 @@ async def run_uploader(client: httpx.AsyncClient) -> bool:
 
                     if any(marker in line for line in new_lines for marker in DONE_MARKERS):
                         log("✅ Uploader finished — stopping publisher service...")
-                        await client.post(
-                            f"{LAUNCHER_BASE}/launcher/services/youtube_publisher/stop"
-                        )
+                        await client.post(f"{launcher_base}/launcher/services/youtube_publisher/stop")
                         await asyncio.sleep(2)
                         return True
 
-                r2 = await client.get(f"{LAUNCHER_BASE}/launcher/services")
+                r2 = await client.get(f"{launcher_base}/launcher/services")
                 if r2.is_success:
                     svcs   = r2.json()
                     svc    = next((s for s in svcs if s["id"] == "youtube_publisher"), None)

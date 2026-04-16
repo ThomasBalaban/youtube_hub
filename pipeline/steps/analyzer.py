@@ -2,7 +2,7 @@ import asyncio
 import httpx
 
 from pipeline.state  import state, log
-from pipeline.config import LAUNCHER_BASE
+from pipeline.config import get_launcher_base
 
 DONE_MARKERS = [
     ">> Done. All drafts analyzed.",
@@ -10,11 +10,7 @@ DONE_MARKERS = [
     "Could not navigate",
 ]
 API_LIMIT_MARKERS = [
-    "429",
-    "RESOURCE_EXHAUSTED",
-    "quota",
-    "rateLimitExceeded",
-    "too many requests",
+    "429", "RESOURCE_EXHAUSTED", "quota", "rateLimitExceeded", "too many requests",
 ]
 ERROR_MARKERS = ["CRITICAL:", "Navigation failed"]
 
@@ -27,9 +23,11 @@ async def run_analyzer(client: httpx.AsyncClient) -> tuple[bool, bool]:
     state["step"]       = "analyzing"
     state["step_label"] = "Analyzing drafts with Gemini AI..."
 
+    launcher_base = get_launcher_base()
+
     try:
         r = await client.post(
-            f"{LAUNCHER_BASE}/launcher/publisher/settings",
+            f"{launcher_base}/launcher/publisher/settings",
             json={
                 "PROCESS_SINGLE_VIDEO": False,
                 "ENABLE_SCRAPING_MODE": False,
@@ -43,9 +41,7 @@ async def run_analyzer(client: httpx.AsyncClient) -> tuple[bool, bool]:
             return False, False
         log("✅ Publisher set to AI Analysis mode")
 
-        r = await client.post(
-            f"{LAUNCHER_BASE}/launcher/services/youtube_publisher/start"
-        )
+        r = await client.post(f"{launcher_base}/launcher/services/youtube_publisher/start")
         if not r.is_success:
             log(f"❌ Could not start publisher (HTTP {r.status_code})")
             return False, False
@@ -57,11 +53,11 @@ async def run_analyzer(client: httpx.AsyncClient) -> tuple[bool, bool]:
         while True:
             await asyncio.sleep(10)
             if not state["running"]:
-                await client.post(f"{LAUNCHER_BASE}/launcher/services/youtube_publisher/stop")
+                await client.post(f"{launcher_base}/launcher/services/youtube_publisher/stop")
                 return False, False
             try:
                 lr = await client.get(
-                    f"{LAUNCHER_BASE}/launcher/services/youtube_publisher/logs?last=500",
+                    f"{launcher_base}/launcher/services/youtube_publisher/logs?last=500",
                     timeout=10.0,
                 )
                 if lr.is_success:
@@ -74,28 +70,22 @@ async def run_analyzer(client: httpx.AsyncClient) -> tuple[bool, bool]:
                     combined = " ".join(new_lines).lower()
                     if any(m.lower() in combined for m in API_LIMIT_MARKERS):
                         log("⚠️ Gemini API limit detected — stopping for the day")
-                        await client.post(
-                            f"{LAUNCHER_BASE}/launcher/services/youtube_publisher/stop"
-                        )
+                        await client.post(f"{launcher_base}/launcher/services/youtube_publisher/stop")
                         await asyncio.sleep(2)
                         return False, True
 
                     if any(m in line for line in new_lines for m in DONE_MARKERS):
                         log("✅ Analyzer finished — stopping publisher...")
-                        await client.post(
-                            f"{LAUNCHER_BASE}/launcher/services/youtube_publisher/stop"
-                        )
+                        await client.post(f"{launcher_base}/launcher/services/youtube_publisher/stop")
                         await asyncio.sleep(2)
                         return True, False
 
                     if any(m in line for line in new_lines for m in ERROR_MARKERS):
                         log("❌ Analyzer hit a critical error")
-                        await client.post(
-                            f"{LAUNCHER_BASE}/launcher/services/youtube_publisher/stop"
-                        )
+                        await client.post(f"{launcher_base}/launcher/services/youtube_publisher/stop")
                         return False, False
 
-                r2 = await client.get(f"{LAUNCHER_BASE}/launcher/services")
+                r2 = await client.get(f"{launcher_base}/launcher/services")
                 if r2.is_success:
                     svcs = r2.json()
                     svc  = next((s for s in svcs if s["id"] == "youtube_publisher"), None)

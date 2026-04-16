@@ -1,7 +1,7 @@
 import httpx
 
 from pipeline.state  import state, log
-from pipeline.config import LAUNCHER_BASE
+from pipeline.config import get_launcher_base
 
 
 async def run_check_unuploaded(client: httpx.AsyncClient) -> bool:
@@ -11,10 +11,12 @@ async def run_check_unuploaded(client: httpx.AsyncClient) -> bool:
     state["step"]       = "checking"
     state["step_label"] = "Auditing uploads and cleaning up local files..."
 
+    launcher_base = get_launcher_base()
+
     try:
         log("▶ Running check_unuploaded script...")
         r = await client.post(
-            f"{LAUNCHER_BASE}/launcher/publisher/check-unuploaded",
+            f"{launcher_base}/launcher/publisher/check-unuploaded",
             timeout=120.0,
         )
 

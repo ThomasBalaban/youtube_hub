@@ -32,7 +32,7 @@ load_dotenv()
 
 from service_defs import SERVICE_DEFS, BOOT_RETRIES, THIS_DIR
 
-LAUNCHER_PORT = int(os.environ.get("LAUNCHER_PORT", 9010))
+LAUNCHER_PORT = int(os.environ.get("LAUNCHER_PORT", 9011))
 # Write back so every submodule (pipeline, etc.) reads the correct port
 # regardless of how this process was spawned.
 os.environ["LAUNCHER_PORT"] = str(LAUNCHER_PORT)

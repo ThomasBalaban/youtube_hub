@@ -2,7 +2,7 @@ import asyncio
 import httpx
 
 from pipeline.state  import state, log
-from pipeline.config import LAUNCHER_BASE
+from pipeline.config import get_launcher_base
 
 SUBTITLER_BASE = "http://localhost:9020"
 
@@ -15,6 +15,7 @@ async def run_subtitler(client: httpx.AsyncClient, files: list) -> bool:
     state["step_label"] = f"Processing {len(files)} file(s) through SimpleAutoSubs..."
 
     paths = [f[1] for f in files]
+    launcher_base = get_launcher_base()
 
     log("Files to process:")
     for p in paths:
@@ -22,7 +23,7 @@ async def run_subtitler(client: httpx.AsyncClient, files: list) -> bool:
         log(f"   • {os.path.basename(p)}")
 
     try:
-        svc_r = await client.get(f"{LAUNCHER_BASE}/launcher/services")
+        svc_r = await client.get(f"{launcher_base}/launcher/services")
         if svc_r.is_success:
             svcs    = svc_r.json()
             api_svc = next((s for s in svcs if s["id"] == "simple_auto_subs_api"), None)
@@ -30,12 +31,12 @@ async def run_subtitler(client: httpx.AsyncClient, files: list) -> bool:
             if not api_svc or api_svc["status"] != "online":
                 log("▶ Starting SimpleAutoSubs API (heavy imports — allow up to 3 min)...")
                 await client.post(
-                    f"{LAUNCHER_BASE}/launcher/services/simple_auto_subs_api/start"
+                    f"{launcher_base}/launcher/services/simple_auto_subs_api/start"
                 )
                 api_ready = False
                 for attempt in range(36):
                     await asyncio.sleep(5)
-                    r2 = await client.get(f"{LAUNCHER_BASE}/launcher/services")
+                    r2 = await client.get(f"{launcher_base}/launcher/services")
                     if r2.is_success:
                         svcs2  = r2.json()
                         api2   = next((s for s in svcs2 if s["id"] == "simple_auto_subs_api"), None)
@@ -73,9 +74,7 @@ async def run_subtitler(client: httpx.AsyncClient, files: list) -> bool:
             await asyncio.sleep(5)
 
             try:
-                log_r = await client.get(
-                    f"{SUBTITLER_BASE}/logs?last=500", timeout=3.0
-                )
+                log_r = await client.get(f"{SUBTITLER_BASE}/logs?last=500", timeout=3.0)
                 if log_r.is_success:
                     all_lines = log_r.json().get("lines", [])
                     for line in all_lines[log_cursor:]:

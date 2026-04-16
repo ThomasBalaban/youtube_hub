@@ -43,15 +43,22 @@ def read_inventory() -> dict:
         return {}
 
     try:
-        # Guard against empty file (e.g. scanner wrote it mid-run or it got corrupted)
-        if os.path.getsize(inv_path) == 0:
+        size = os.path.getsize(inv_path)
+        if size == 0:
             log("⚠️ copied_inventory.json is empty — skipping")
             return {}
 
         with open(inv_path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            raw = f.read().strip()
 
-    except json.JSONDecodeError as e:
+        if not raw:
+            log("⚠️ copied_inventory.json contains only whitespace — skipping")
+            return {}
+
+        return json.loads(raw)
+
+    except (ValueError, json.JSONDecodeError) as e:
+        # Catches empty/partial writes from scanner running concurrently
         log(f"⚠️ copied_inventory.json is not valid JSON — skipping ({e})")
         return {}
     except Exception as e:

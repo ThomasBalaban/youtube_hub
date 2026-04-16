@@ -2,7 +2,7 @@ import asyncio
 import httpx
 
 from pipeline.state  import state, log
-from pipeline.config import LAUNCHER_BASE
+from pipeline.config import get_launcher_base
 
 
 async def run_scanner(client: httpx.AsyncClient) -> bool:
@@ -12,9 +12,11 @@ async def run_scanner(client: httpx.AsyncClient) -> bool:
     state["step"]       = "scanning"
     state["step_label"] = "Scanning SMB drive for new recordings..."
 
+    launcher_base = get_launcher_base()
+
     try:
         r = await client.post(
-            f"{LAUNCHER_BASE}/launcher/services/backtrack_scanner/start"
+            f"{launcher_base}/launcher/services/backtrack_scanner/start"
         )
         if not r.is_success:
             log(f"❌ Could not start scanner (HTTP {r.status_code})")
@@ -25,7 +27,7 @@ async def run_scanner(client: httpx.AsyncClient) -> bool:
 
         for _ in range(60):
             await asyncio.sleep(3)
-            r2 = await client.get(f"{LAUNCHER_BASE}/launcher/services")
+            r2 = await client.get(f"{launcher_base}/launcher/services")
             if r2.is_success:
                 svcs = r2.json()
                 svc  = next((s for s in svcs if s["id"] == "backtrack_scanner"), None)
