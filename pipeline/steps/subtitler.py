@@ -4,8 +4,7 @@ import httpx
 from pipeline.state  import state, log
 from pipeline.config import get_launcher_base
 
-SUBTITLER_BASE = "http://localhost:9020"
-
+SUBTITLER_BASE = "http://127.0.0.1:9020"
 
 async def run_subtitler(client: httpx.AsyncClient, files: list) -> bool:
     log("─" * 40)

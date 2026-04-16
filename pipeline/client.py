@@ -8,16 +8,15 @@ import httpx
 _http_client: httpx.AsyncClient | None = None
 
 
+# pipeline/client.py
+
 async def get_client() -> httpx.AsyncClient:
     """Lazily create the shared httpx client on first use."""
     global _http_client
     if _http_client is None:
-        # connect timeout is short (fail fast if nothing is listening).
-        # read timeout is None because the SimpleAutoSubs event loop can be
-        # starved by heavy AI/transcription work for several minutes at a time.
-        # The outer poll loop enforces a 1-hour overall ceiling separately.
         _http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(connect=10.0, read=None, write=10.0, pool=10.0)
+            timeout=httpx.Timeout(connect=10.0, read=None, write=10.0, pool=10.0),
+            trust_env=False  # Prevents VPNs/proxies from blocking the local request
         )
     return _http_client
 

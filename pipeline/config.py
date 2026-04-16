@@ -16,7 +16,7 @@ import os
 def get_launcher_base() -> str:
     """Return the current launcher base URL, reading LAUNCHER_PORT from env."""
     port = int(os.environ.get("LAUNCHER_PORT", 9011))
-    return f"http://localhost:{port}"
+    return f"http://127.0.0.1:{port}"
 
 
 # Module-level constant kept for any legacy references,
