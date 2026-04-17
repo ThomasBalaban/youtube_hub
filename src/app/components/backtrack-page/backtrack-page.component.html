@@ -23,16 +23,16 @@
   }
 
   <div class="page-panels">
-    
+
     <div class="left-panel">
       <section class="section controls-section">
         <div class="ctrl-row">
-          <button class="btn btn-run" 
+          <button class="btn btn-run"
                   [disabled]="!launcherOnline() || isRunning() || isStarting() || actionPending()"
                   (click)="serviceAction('start')">
             ▶ Run Scanner
           </button>
-          <button class="btn btn-stop" 
+          <button class="btn btn-stop"
                   [disabled]="!launcherOnline() || (!isRunning() && !isStarting()) || actionPending()"
                   (click)="serviceAction('stop')">
             ■ Stop
@@ -68,6 +68,7 @@
             <span class="viewer-title">{{ selectedFile()?.label }}</span>
             <span class="viewer-path">{{ selectedFile()?.path }}</span>
           </div>
+          <button class="btn-erase" (click)="openClearModal()" title="Delete this file">🗑 Erase</button>
         } @else {
           <span class="viewer-title">Output Files</span>
           <button class="viewer-refresh-btn" [disabled]="!launcherOnline()" (click)="refreshDataFiles()">↻ Refresh</button>
@@ -82,7 +83,7 @@
               <div class="data-file-info">
                 <span class="data-file-label">{{ file.label }}</span>
                 <span class="data-file-desc">{{ file.description }}</span>
-                @if (file.exists) { <span class="data-file-meta">{{ formatSize(file.size) }} · {{ formatDate(file.modified) }}</span> } 
+                @if (file.exists) { <span class="data-file-meta">{{ formatSize(file.size) }} · {{ formatDate(file.modified) }}</span> }
                 @else { <span class="data-file-missing">Not yet generated</span> }
               </div>
               @if (file.exists) { <span class="data-file-arrow">›</span> }
@@ -113,4 +114,24 @@
     </div>
 
   </div>
+
+  @if (showClearModal()) {
+    <div class="modal-overlay" (click)="cancelClear()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-icon">🗑</div>
+        <h3 class="modal-title">Erase file?</h3>
+        <p class="modal-body">
+          Are you sure you want to permanently delete
+          <strong>{{ selectedFile()?.label }}</strong>?<br>
+          This cannot be undone.
+        </p>
+        <div class="modal-actions">
+          <button class="modal-btn modal-btn-cancel" [disabled]="clearing()" (click)="cancelClear()">Cancel</button>
+          <button class="modal-btn modal-btn-confirm" [disabled]="clearing()" (click)="confirmClear()">
+            @if (clearing()) { <span class="btn-spin"></span>Deleting… } @else { Delete }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
 </div>

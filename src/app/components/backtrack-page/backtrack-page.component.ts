@@ -25,23 +25,26 @@ interface DataFileMeta {
 export class BacktrackPageComponent extends PollingComponent {
   protected override pollingInterval = 2500;
 
-  serviceStatus = signal<ServiceStatus | null>(null);
+  serviceStatus  = signal<ServiceStatus | null>(null);
   launcherOnline = signal(false);
-  actionPending = signal(false);
-  logs = signal<string[]>([]);
-  lastUpdated = signal('—');
+  actionPending  = signal(false);
+  logs           = signal<string[]>([]);
+  lastUpdated    = signal('—');
 
   // Data Viewer State
-  dataFiles = signal<DataFileMeta[]>([]);
-  dataViewState = signal<'list' | 'file'>('list');
-  selectedFile = signal<DataFileMeta | null>(null);
+  dataFiles       = signal<DataFileMeta[]>([]);
+  dataViewState   = signal<'list' | 'file'>('list');
+  selectedFile    = signal<DataFileMeta | null>(null);
   selectedContent = signal<Record<string, string> | null>(null);
-  dataLoading = signal(false);
+  dataLoading     = signal(false);
 
-  isRunning = computed(() => this.serviceStatus()?.status === 'online');
+  // Clear modal
+  showClearModal = signal(false);
+  clearing       = signal(false);
+
+  isRunning  = computed(() => this.serviceStatus()?.status === 'online');
   isStarting = computed(() => this.serviceStatus()?.status === 'starting');
 
-  // Convert the dictionary object into an array for easy looping in HTML
   parsedContentList = computed(() => {
     const content = this.selectedContent();
     if (!content) return [];
@@ -61,8 +64,8 @@ export class BacktrackPageComponent extends PollingComponent {
     return map[s] ?? map['unknown'];
   });
 
-  isErr = (l: string) => /error|failed|exception|abort/i.test(l);
-  isOk = (l: string) => /✅|success|completed|rebuilt/i.test(l);
+  isErr  = (l: string) => /error|failed|exception|abort/i.test(l);
+  isOk   = (l: string) => /✅|success|completed|rebuilt/i.test(l);
   isWarn = (l: string) => /warn|warning|⚠/i.test(l);
 
   override async poll() {
@@ -80,10 +83,9 @@ export class BacktrackPageComponent extends PollingComponent {
       this.launcherOnline.set(false);
       this.lastUpdated.set('Launcher offline');
     }
-    
+
     await this.refreshLogs();
-    
-    // Refresh files if we are on the list view
+
     if (this.dataViewState() === 'list') {
       await this.refreshDataFiles();
     }
@@ -114,7 +116,8 @@ export class BacktrackPageComponent extends PollingComponent {
     this.logs.set([]);
   }
 
-  // --- Data Viewer Methods ---
+  // ── Data Viewer ──────────────────────────────────────────────────────────────
+
   async refreshDataFiles() {
     if (!this.launcherOnline()) return;
     const res = await fetch('/launcher/backtrack/data/files').catch(() => null);
@@ -127,7 +130,7 @@ export class BacktrackPageComponent extends PollingComponent {
     this.dataViewState.set('file');
     this.dataLoading.set(true);
     this.selectedContent.set(null);
-    
+
     const res = await fetch(`/launcher/backtrack/data/file?key=${file.key}`).catch(() => null);
     if (res?.ok) {
       const d = await res.json();
@@ -142,6 +145,28 @@ export class BacktrackPageComponent extends PollingComponent {
     this.selectedContent.set(null);
     this.refreshDataFiles();
   }
+
+  // ── Clear Modal ───────────────────────────────────────────────────────────────
+
+  openClearModal()  { this.showClearModal.set(true); }
+  cancelClear()     { this.showClearModal.set(false); }
+
+  async confirmClear() {
+    const key = this.selectedFile()?.key;
+    if (!key) return;
+    this.clearing.set(true);
+    try {
+      const res = await fetch(`/launcher/backtrack/data/file?key=${key}`, { method: 'DELETE' });
+      if (res.ok) {
+        this.showClearModal.set(false);
+        this.backToDataList();
+      }
+    } finally {
+      this.clearing.set(false);
+    }
+  }
+
+  // ── Formatting ────────────────────────────────────────────────────────────────
 
   formatSize(bytes: number): string {
     if (bytes < 1024) return `${bytes}B`;

@@ -11,8 +11,6 @@ THIS_DIR          = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HUB_SETTINGS_FILE = os.path.join(THIS_DIR, "hub_settings.json")
 BACKTRACK_DIR     = os.path.join(os.path.dirname(THIS_DIR), "backtrack_scanner")
 
-MAX_FILES_PER_RUN = 3
-
 
 # ── Hub settings ──────────────────────────────────────────────────────────────
 
@@ -39,7 +37,7 @@ def read_inventory() -> dict:
     inv_path = os.path.join(BACKTRACK_DIR, "copied_inventory.json")
 
     if not os.path.exists(inv_path):
-        log("⚠️ copied_inventory.json not found")
+        log(f"⚠️ copied_inventory.json not found (looked in: {inv_path})")
         return {}
 
     try:
@@ -58,7 +56,6 @@ def read_inventory() -> dict:
         return json.loads(raw)
 
     except (ValueError, json.JSONDecodeError) as e:
-        # Catches empty/partial writes from scanner running concurrently
         log(f"⚠️ copied_inventory.json is not valid JSON — skipping ({e})")
         return {}
     except Exception as e:
@@ -68,9 +65,16 @@ def read_inventory() -> dict:
 
 def get_new_files() -> list:
     """
-    Return up to MAX_FILES_PER_RUN (filename, full_path) tuples not yet in
-    history. Files in the inventory but missing from disk (cluster-deleted)
-    are auto-marked as handled so they never re-appear.
+    Return all (filename, full_path) tuples not yet processed.
+
+    Handles three cases:
+      - Not in history at all + exists on disk  → queue it
+      - In history as "deleted" but back on disk → un-delete and re-queue
+        (happens when the user clears the dest folder and the scanner
+        re-copies the same filenames, or when cluster-cleanup trashed a
+        file that has since been restored)
+      - In history as "deleted" and still missing → skip (already handled)
+      - In history with a timestamp              → skip (already processed)
     """
     inventory = read_inventory()
     settings  = read_hub_settings()
@@ -78,21 +82,57 @@ def get_new_files() -> list:
         "backtrack_dest_dir", "/Users/thomasbalaban/Downloads/todoshorts"
     )
 
-    new_files = []
+    log(f"🔍 dest_dir: {dest_dir}")
+    log(f"📋 Inventory: {len(inventory)} total entries | History: {len(history)} entries")
+
+    if not inventory:
+        log("⚠️ Inventory is empty — nothing to check")
+        return []
+
+    new_files            = []
+    already_processed    = 0
+    resurrected          = 0
+    missing_from_disk    = 0
+    history_changed      = False
+
     for filename in inventory:
-        if filename in history:
-            continue
         full_path = os.path.join(dest_dir, filename)
-        if os.path.exists(full_path):
-            new_files.append((filename, full_path))
+        hist_val  = history.get(filename)
+
+        if hist_val is None:
+            # Never seen before
+            if os.path.exists(full_path):
+                new_files.append((filename, full_path))
+            else:
+                log(f"⚠️ New inventory entry missing from disk: {filename}")
+                history[filename] = "deleted"
+                history_changed = True
+                missing_from_disk += 1
+
+        elif hist_val == "deleted":
+            # Was previously trashed — check if it came back
+            if os.path.exists(full_path):
+                log(f"🔄 Resurrected (was deleted, now on disk): {filename}")
+                del history[filename]
+                history_changed = True
+                new_files.append((filename, full_path))
+                resurrected += 1
+            else:
+                missing_from_disk += 1
+
         else:
-            log(f"⚠️ File deleted/missing, marking as handled: {filename}")
-            history[filename] = "deleted"
-            save_history()
+            # Has a real timestamp — already processed, skip
+            already_processed += 1
+
+    if history_changed:
+        save_history()
+
+    log(
+        f"📊 {already_processed} already processed | "
+        f"{missing_from_disk} missing from disk | "
+        f"{resurrected} resurrected | "
+        f"{len(new_files)} ready to process"
+    )
 
     new_files.sort(key=lambda x: x[0])
-    selected = new_files[:MAX_FILES_PER_RUN]
-
-    if new_files:
-        log(f"📂 {len(inventory)} in inventory, {len(new_files)} new, selecting {len(selected)}")
-    return selected
+    return new_files

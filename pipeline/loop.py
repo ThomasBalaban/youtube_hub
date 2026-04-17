@@ -2,19 +2,24 @@
 Main pipeline loop — full automation cycle:
 
   1. Scan SMB drive once.
-  2. Drain loop — SimpleAutoSubs until backlog is completely empty.
-  3. Once backlog is clear (whether or not files were processed this cycle):
+  2. Collect ALL new files from inventory in one snapshot.
+  3. Send all files to SimpleAutoSubs and wait until every file is done.
+  4. Once processing is complete (or if there was nothing to process):
        a. Upload processed videos to YouTube.
        b. Check unuploaded / cleanup local files.
        c. Publish inner loop — repeat until no drafts or API limit:
             i.  Scraper  — refresh draft/scheduled data
             ii. Analyzer — AI analysis of new drafts
             iii.Publish batch — schedule to YouTube
-  4. 5-minute wait before next scan.
+  5. 5-minute wait before next scan.
 
 Key behaviour:
-  - Upload/publish runs whenever the backlog is empty — including cycles where
-    files were processed this cycle (fixes the one-cycle-behind bug).
+  - ALL new files are snapshotted immediately after the scanner exits,
+    before cluster-cleanup can trash duplicates and confuse the inventory
+    check. The old per-batch drain loop caused files to be mis-marked as
+    "deleted" on the second get_new_files() call.
+  - Upload/publish runs whenever processing is clear — including cycles
+    where files were processed this cycle.
   - Upload/publish is only skipped if SAS actually errored, or the pipeline
     was stopped mid-cycle.
   - The publish inner loop keeps going until:
@@ -66,23 +71,20 @@ async def pipeline_loop() -> None:
         if not scan_ok:
             cycle_errors.append("Scanner failed — see log for details")
 
-        # ── Step 2: Drain SimpleAutoSubs ─────────────────────────────────────
-        # Keeps running in 3-file batches until the backlog is completely empty.
-        # Sets drain_failed=True if SAS errors so upload/publish can be skipped.
+        # ── Step 2: Process ALL new files through SimpleAutoSubs ──────────────
+        # Snapshot new files immediately after the scanner exits, before
+        # cluster-cleanup can trash duplicates and cause a second call to
+        # get_new_files() to mis-mark those files as "deleted".
         drain_failed = False
-        batch_num = 0
+        new_files = get_new_files()
 
-        while state["running"]:
-            new_files = get_new_files()
-            if not new_files:
-                if batch_num == 0:
-                    log("ℹ️ No new files to process this cycle")
-                else:
-                    log(f"✅ Drain complete — {cycle_processed} file(s) processed this cycle")
-                break
+        if not new_files:
+            log("ℹ️ No new files to process this cycle")
+        else:
+            log(f"─── SimpleAutoSubs ({len(new_files)} file(s)) ───")
+            for filename, path in new_files:
+                log(f"   • {filename}")
 
-            batch_num += 1
-            log(f"─── SimpleAutoSubs batch {batch_num} ({len(new_files)} file(s)) ───")
             process_ok = await run_subtitler(client, new_files)
 
             if process_ok:
@@ -90,18 +92,16 @@ async def pipeline_loop() -> None:
                 for filename, _ in new_files:
                     history[filename] = ts
                 save_history()
-                cycle_processed += len(new_files)
-                log(f"📝 Batch {batch_num} saved — {cycle_processed} total this cycle")
+                cycle_processed = len(new_files)
+                log(f"✅ All {cycle_processed} file(s) processed and saved to history")
             else:
-                err = f"SimpleAutoSubs batch {batch_num} failed — see log"
+                err = "SimpleAutoSubs failed — see log"
                 cycle_errors.append(err)
-                log(f"⚠️ {err} — stopping drain")
+                log(f"⚠️ {err}")
                 drain_failed = True
-                break
 
         # ── Steps 3–7: Upload + Publish ───────────────────────────────────────
-        # Runs whenever the backlog is fully empty, regardless of whether files
-        # were processed in this cycle or a previous one.
+        # Runs whenever processing is complete (or nothing needed processing).
         # Only skipped when SAS errored or the pipeline was stopped.
         backlog_clear = state["running"] and not drain_failed
 
@@ -160,7 +160,7 @@ async def pipeline_loop() -> None:
                 log(f"✅ Round {publish_round} complete — checking for more drafts...")
 
         elif drain_failed:
-            log("⚠️ SAS drain failed — skipping upload/publish until next cycle")
+            log("⚠️ SAS processing failed — skipping upload/publish until next cycle")
 
         # ── Record the cycle ──────────────────────────────────────────────────
         state["errors"] = cycle_errors

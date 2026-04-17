@@ -42,14 +42,29 @@ def list_data_files():
 def get_data_file(key: str):
     if key not in DATA_FILES:
         raise HTTPException(404, f"Unknown file: {key}")
-    
+
     full = os.path.join(BACKTRACK_DIR, DATA_FILES[key]["path"])
     if not os.path.exists(full):
         raise HTTPException(404, f"File not yet generated: {DATA_FILES[key]['path']}")
-    
+
     try:
         with open(full, "r", encoding="utf-8") as f:
             data = json.load(f)
         return {"key": key, "label": DATA_FILES[key]["label"], "data": data}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+@router.delete("/data/file")
+def delete_data_file(key: str):
+    if key not in DATA_FILES:
+        raise HTTPException(404, f"Unknown file: {key}")
+
+    full = os.path.join(BACKTRACK_DIR, DATA_FILES[key]["path"])
+    if not os.path.exists(full):
+        raise HTTPException(404, f"File not found: {DATA_FILES[key]['path']}")
+
+    try:
+        os.remove(full)
+        return {"ok": True, "deleted": DATA_FILES[key]["path"]}
     except Exception as e:
         raise HTTPException(500, str(e))
