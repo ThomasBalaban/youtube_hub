@@ -267,11 +267,6 @@ app.add_middleware(
 # ─────────────────────────────────────────────
 # Routers
 # ─────────────────────────────────────────────
-# NOTE: publisher_routes.py is the LEGACY standalone pipeline router and is
-# intentionally NOT included. The active pipeline lives in the pipeline/
-# package. Including both caused /launcher/pipeline/* to resolve to the
-# legacy copy (hardcoded to port 9010) and silently fail every cross-service
-# call from the Auto-Run page.
 
 from subtitler_routes import router as subtitler_router
 app.include_router(subtitler_router, prefix="/launcher")
@@ -281,6 +276,12 @@ app.include_router(backtrack_router, prefix="/launcher")
 
 from pipeline import router as pipeline_router
 app.include_router(pipeline_router, prefix="/launcher")
+
+# Publisher router — provides /launcher/publisher/* for the frontend and
+# pipeline steps. Reads/writes runtime_settings.json in the publisher dir
+# so the publisher process picks up the correct mode at startup.
+from publisher_routes import router as publisher_router
+app.include_router(publisher_router, prefix="/launcher")
 
 # ─────────────────────────────────────────────
 # Routes
