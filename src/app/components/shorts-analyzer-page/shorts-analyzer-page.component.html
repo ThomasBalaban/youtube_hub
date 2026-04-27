@@ -132,23 +132,30 @@
     <!-- Right panel: files / videos / raw -->
     <div class="right-panel">
       <div class="viewer-header">
-        @if (viewState() !== 'list') {
-          <button class="viewer-back-btn" (click)="backToFiles()">← Back</button>
-          <div class="viewer-title-group">
-            <span class="viewer-title">
-              <span class="kind-badge" [attr.data-kind]="fileKind(selectedFile()!.name)">
-                {{ kindIcon(fileKind(selectedFile()!.name)) }} {{ kindLabel(fileKind(selectedFile()!.name)) }}
+        <nav class="breadcrumbs" aria-label="Breadcrumb">
+          @for (crumb of breadcrumbs(); track $index; let isLast = $last) {
+            @if (crumb.click) {
+              <button class="crumb crumb--link" (click)="crumb.click!()">
+                <span class="crumb-label">{{ crumb.label }}</span>
+                @if (crumb.sub) { <span class="crumb-sub">{{ crumb.sub }}</span> }
+              </button>
+            } @else {
+              <span class="crumb" [class.crumb--current]="crumb.current">
+                <span class="crumb-label">{{ crumb.label }}</span>
+                @if (crumb.sub) { <span class="crumb-sub">{{ crumb.sub }}</span> }
               </span>
-              {{ selectedFile()?.name }}
-            </span>
-            <span class="viewer-path">{{ selectedFile()?.path }}</span>
-          </div>
-          <button class="viewer-refresh-btn" (click)="downloadFile(selectedFile()!)" title="Download JSON">⬇ Download</button>
-          <button class="btn-erase" (click)="openDeleteModal()" title="Delete this file">🗑 Delete</button>
-        } @else {
-          <span class="viewer-title">Output Files</span>
-          <button class="viewer-refresh-btn" [disabled]="!apiOnline()" (click)="refreshFiles()">↻ Refresh</button>
-        }
+            }
+            @if (!isLast) { <span class="crumb-sep">/</span> }
+          }
+        </nav>
+        <div class="viewer-actions">
+          @if (viewState() === 'list') {
+            <button class="viewer-refresh-btn" [disabled]="!apiOnline()" (click)="refreshFiles()">↻ Refresh</button>
+          } @else if (selectedFile()) {
+            <button class="viewer-refresh-btn" (click)="downloadFile(selectedFile()!)" title="Download JSON">⬇ Download</button>
+            <button class="btn-erase" (click)="openDeleteModal()" title="Delete this file">🗑 Delete</button>
+          }
+        </div>
       </div>
 
       <!-- File list view -->
@@ -341,8 +348,8 @@
               <span class="col-phase">Tailwind</span>
             </div>
             @for (v of videosResponse()!.videos; track v.video_id) {
-              <label class="video-row">
-                <span class="col-check">
+              <div class="video-row video-row--clickable" (click)="openVideo(v.video_id)">
+                <span class="col-check" (click)="$event.stopPropagation()">
                   <input type="checkbox"
                          [checked]="selectedIds().has(v.video_id)"
                          (change)="toggleSelect(v.video_id)" />
@@ -362,7 +369,7 @@
                 <span class="col-phase">
                   <span class="phase-pill" [ngClass]="phaseClass(v.phases.tailwind)">{{ phaseLabel(v.phases.tailwind) }}</span>
                 </span>
-              </label>
+              </div>
             }
             @if (videosResponse()!.videos.length === 0) {
               <div class="viewer-empty"><span>—</span><span>No videos in this file.</span></div>
@@ -372,7 +379,253 @@
         }
       }
 
-      <!-- Raw JSON viewer (synthesis / tailwind / context) -->
+      <!-- Synthesis dashboard -->
+      @if (viewState() === 'synthesis') {
+        @if (loadingFile()) {
+          <div class="viewer-empty"><span class="viewer-empty-icon">⏳</span><span>Loading synthesis…</span></div>
+        } @else if (!synthesisData()) {
+          <div class="viewer-empty"><span class="viewer-empty-icon">⚠</span><span>Could not load synthesis file.</span></div>
+        } @else {
+          <div class="synth-scroll">
+            @if (synthesisData()!.metadata?.small_corpus_warning) {
+              <div class="banner-warn synth-warn">⚠ Small corpus ({{ synthesisData()!.metadata?.total_shorts }} shorts) — treat insights as directional hypotheses.</div>
+            }
+
+            <!-- Stat cards -->
+            @if (synthesisData()!.corpus_stats; as cs) {
+              <div class="stat-grid">
+                <div class="stat-card">
+                  <div class="stat-label">Shorts</div>
+                  <div class="stat-value">{{ cs.total_shorts ?? '—' }}</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-label">Median Breakout</div>
+                  <div class="stat-value">{{ formatRatio(cs.breakout_score?.median) }}</div>
+                  <div class="stat-sub">range {{ formatRatio(cs.breakout_score?.min) }} – {{ formatRatio(cs.breakout_score?.max) }}</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-label">Median Views</div>
+                  <div class="stat-value">{{ formatViews(cs.views?.median ?? 0) }}</div>
+                  <div class="stat-sub">mean {{ formatViews(cs.views?.mean ?? 0) }}</div>
+                </div>
+                @if (synthesisData()!.quintiles; as q) {
+                  <div class="stat-card">
+                    <div class="stat-label">Quintile Cuts</div>
+                    <div class="stat-value">↑ {{ formatRatio(q.top_threshold) }}</div>
+                    <div class="stat-sub">↓ {{ formatRatio(q.bottom_threshold) }} · n={{ q.n_top }}/{{ q.n_bottom }}</div>
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- Quintile video lists -->
+            @if (synthesisData()!.quintiles; as q) {
+              <div class="quintile-row">
+                <div class="quintile-block quintile-block--top">
+                  <div class="quintile-label">Top quintile <span class="quintile-count">({{ q.top_video_ids?.length || 0 }})</span></div>
+                  @for (id of q.top_video_ids ?? []; track id) {
+                    <button class="quintile-vid" (click)="jumpToVideoFromSynthesis(id)">{{ id }}</button>
+                  }
+                </div>
+                <div class="quintile-block quintile-block--bottom">
+                  <div class="quintile-label">Bottom quintile <span class="quintile-count">({{ q.bottom_video_ids?.length || 0 }})</span></div>
+                  @for (id of q.bottom_video_ids ?? []; track id) {
+                    <button class="quintile-vid" (click)="jumpToVideoFromSynthesis(id)">{{ id }}</button>
+                  }
+                </div>
+              </div>
+            }
+
+            <!-- Narrative prose blocks -->
+            @if (synthesisData()!.narrative; as n) {
+              <div class="narrative-grid">
+                @if (n.top_quintile_signature) {
+                  <div class="narrative-card narrative-card--top">
+                    <h3 class="narrative-h">↑ Top Quintile Signature</h3>
+                    <p>{{ n.top_quintile_signature }}</p>
+                  </div>
+                }
+                @if (n.bottom_quintile_signature) {
+                  <div class="narrative-card narrative-card--bottom">
+                    <h3 class="narrative-h">↓ Bottom Quintile Signature</h3>
+                    <p>{{ n.bottom_quintile_signature }}</p>
+                  </div>
+                }
+                @if (n.load_bearing_patterns) {
+                  <div class="narrative-card">
+                    <h3 class="narrative-h">⚓ Load-Bearing Patterns</h3>
+                    <p>{{ n.load_bearing_patterns }}</p>
+                  </div>
+                }
+                @if (n.conditional_insights) {
+                  <div class="narrative-card">
+                    <h3 class="narrative-h">🔗 Conditional Insights</h3>
+                    <p>{{ n.conditional_insights }}</p>
+                  </div>
+                }
+                @if (n.cautions) {
+                  <div class="narrative-card narrative-card--caution">
+                    <h3 class="narrative-h">⚠ Cautions</h3>
+                    <p>{{ n.cautions }}</p>
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- Pattern tables -->
+            @if (synthesisData()!.unique_to_breakouts?.length) {
+              <h3 class="synth-h">Unique to Breakouts</h3>
+              <div class="pattern-table">
+                <div class="pattern-row pattern-row--head">
+                  <span>Axis</span><span>Tag</span><span class="num">Rate</span><span class="num">n</span><span class="num">Avg breakout</span>
+                </div>
+                @for (r of synthesisData()!.unique_to_breakouts!; track r.tag) {
+                  <div class="pattern-row">
+                    <span class="muted">{{ prettyAxis(r.axis) }}</span>
+                    <span class="mono">{{ r.tag }}</span>
+                    <span class="num">{{ formatPct(r.overall_rate * 100, 0) }}</span>
+                    <span class="num">{{ r.n_overall }}</span>
+                    <span class="num">{{ formatRatio(r.avg_breakout_when_present) }}</span>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (synthesisData()!.absent_from_breakouts?.length) {
+              <h3 class="synth-h">Absent From Breakouts</h3>
+              <div class="pattern-table">
+                <div class="pattern-row pattern-row--head">
+                  <span>Axis</span><span>Tag</span><span class="num">Rate</span><span class="num">n</span><span class="num">Avg breakout</span>
+                </div>
+                @for (r of synthesisData()!.absent_from_breakouts!; track r.tag) {
+                  <div class="pattern-row">
+                    <span class="muted">{{ prettyAxis(r.axis) }}</span>
+                    <span class="mono">{{ r.tag }}</span>
+                    <span class="num">{{ formatPct(r.overall_rate * 100, 0) }}</span>
+                    <span class="num">{{ r.n_overall }}</span>
+                    <span class="num">{{ formatRatio(r.avg_breakout_when_present) }}</span>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (conditionalSorted().length) {
+              <h3 class="synth-h">Conditional Patterns <span class="synth-h-sub">(sorted by lift)</span></h3>
+              <div class="cond-table">
+                <div class="cond-row cond-row--head">
+                  <span>When</span><span>With</span>
+                  <span class="num">A only</span><span class="num">A+B</span><span class="num">A−B</span>
+                  <span class="num">Lift</span><span class="num">n A+B</span>
+                </div>
+                @for (r of conditionalSorted(); track $index) {
+                  <div class="cond-row">
+                    <span><span class="mono">{{ r.when.tag }}</span><span class="cond-axis">{{ prettyAxis(r.when.axis) }}</span></span>
+                    <span><span class="mono">{{ r.with.tag }}</span><span class="cond-axis">{{ prettyAxis(r.with.axis) }}</span></span>
+                    <span class="num">{{ formatRatio(r.mean_breakout_when_A) }}</span>
+                    <span class="num">{{ formatRatio(r.mean_breakout_when_A_and_B) }}</span>
+                    <span class="num">{{ formatRatio(r.mean_breakout_when_A_not_B) }}</span>
+                    <span class="num lift" [class.lift--pos]="r.lift_B_given_A > 1.1" [class.lift--neg]="r.lift_B_given_A < 0.9">×{{ formatRatio(r.lift_B_given_A) }}</span>
+                    <span class="num">{{ r.n_A_and_B }}</span>
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- Tag frequencies — axis tabs + table -->
+            @if (synthesisAxes().length) {
+              <h3 class="synth-h">Tag Frequencies</h3>
+              <div class="axis-tabs">
+                @for (a of synthesisAxes(); track a) {
+                  <button class="axis-tab"
+                          [class.active]="synthesisActiveAxis() === a"
+                          (click)="setSynthesisAxis(a)">
+                    {{ prettyAxis(a) }}
+                  </button>
+                }
+              </div>
+              @if (synthesisAxisTags().length) {
+                <div class="pattern-table">
+                  <div class="pattern-row pattern-row--head pattern-row--wide">
+                    <span>Tag</span>
+                    <span class="num">Overall</span>
+                    <span class="num">Top</span>
+                    <span class="num">Bottom</span>
+                    <span class="num">Lift ↑</span>
+                    <span class="num">Lift ↓</span>
+                    <span class="num">Avg breakout</span>
+                  </div>
+                  @for (r of synthesisAxisTags(); track r.tag) {
+                    <div class="pattern-row pattern-row--wide">
+                      <span class="mono">{{ r.tag }}</span>
+                      <span class="num">{{ r.overall_count }} ({{ formatPct(r.overall_rate * 100, 0) }})</span>
+                      <span class="num">{{ r.top_count }} ({{ formatPct(r.top_rate * 100, 0) }})</span>
+                      <span class="num">{{ r.bottom_count }} ({{ formatPct(r.bottom_rate * 100, 0) }})</span>
+                      <span class="num lift" [class.lift--pos]="r.lift_top > 1.1" [class.lift--neg]="r.lift_top < 0.9 && r.lift_top > 0">×{{ formatRatio(r.lift_top) }}</span>
+                      <span class="num lift" [class.lift--pos]="r.lift_bottom > 1.1" [class.lift--neg]="r.lift_bottom < 0.9 && r.lift_bottom > 0">×{{ formatRatio(r.lift_bottom) }}</span>
+                      <span class="num">{{ formatRatio(r.avg_breakout) }}</span>
+                    </div>
+                  }
+                </div>
+              }
+            }
+          </div>
+        }
+      }
+
+      <!-- Context mini-view -->
+      @if (viewState() === 'context') {
+        @if (loadingFile()) {
+          <div class="viewer-empty"><span class="viewer-empty-icon">⏳</span><span>Loading…</span></div>
+        } @else if (!contextData()) {
+          <div class="viewer-empty"><span class="viewer-empty-icon">⚠</span><span>Could not load file.</span></div>
+        } @else {
+          <div class="synth-scroll">
+            <div class="stat-grid">
+              <div class="stat-card">
+                <div class="stat-label">Overall Median Views</div>
+                <div class="stat-value">{{ formatViews(contextData()!.overall_median ?? 0) }}</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Months Tracked</div>
+                <div class="stat-value">{{ monthlyMediansSorted().length }}</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Videos In Cache</div>
+                <div class="stat-value">{{ objectEntries(contextData()!.videos).length }}</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Built At</div>
+                <div class="stat-value stat-value--small">{{ (contextData()!.built_at ?? '').replace('T', ' ').slice(0, 16) || '—' }}</div>
+              </div>
+            </div>
+
+            @if (monthlyMediansSorted().length > 0) {
+              <h3 class="synth-h">Monthly Median Views</h3>
+              <div class="chart-wrap">
+                <svg class="ctx-chart" viewBox="0 0 460 110" preserveAspectRatio="none">
+                  <path class="ctx-area" [attr.d]="contextChartPath().area" />
+                  <path class="ctx-line" [attr.d]="contextChartPath().line" />
+                  @for (t of contextChartPath().ticks; track t.label) {
+                    <text class="ctx-tick" [attr.x]="t.x" [attr.y]="105" text-anchor="middle">{{ t.label }}</text>
+                  }
+                  <text class="ctx-axis-label" x="4" y="14">{{ formatViews(contextChartPath().yMax) }}</text>
+                  <text class="ctx-axis-label" x="4" y="92">0</text>
+                </svg>
+              </div>
+              <div class="month-list">
+                @for (m of monthlyMediansSorted(); track m.month) {
+                  <div class="month-row">
+                    <span class="month-key">{{ m.month }}</span>
+                    <span class="month-val">{{ formatViews(m.median) }}</span>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      }
+
+      <!-- Generic raw JSON viewer (fallback / unknown file types) -->
       @if (viewState() === 'raw') {
         @if (loadingFile()) {
           <div class="viewer-empty"><span class="viewer-empty-icon">⏳</span><span>Loading…</span></div>
@@ -380,6 +633,157 @@
           <div class="viewer-empty"><span class="viewer-empty-icon">⚠</span><span>Could not load file.</span></div>
         } @else {
           <pre class="raw-json">{{ prettyJson() }}</pre>
+        }
+      }
+
+      <!-- Per-video detail view ────────────────────────────────────────────── -->
+      @if (viewState() === 'video') {
+        @if (!currentShort() && !currentRow()) {
+          <div class="viewer-empty"><span class="viewer-empty-icon">⏳</span><span>Loading video…</span></div>
+        } @else {
+          <div class="video-detail-body">
+            @if (currentRow(); as r) {
+              <div class="video-meta-bar">
+                <span class="drawer-views">{{ formatViews(r.views) }} views</span>
+                @if (r.breakout_score != null) {
+                  <span class="drawer-breakout">breakout {{ r.breakout_score.toFixed(2) }}</span>
+                }
+                <span class="drawer-date">{{ r.published_date }}</span>
+                @if (currentShort()?.url) {
+                  <a class="drawer-link" [attr.href]="currentShort()?.url" target="_blank" rel="noopener">
+                    {{ currentShort()?.video_id ?? currentVideoId() }} ↗
+                  </a>
+                }
+              </div>
+            }
+            <h2 class="drawer-title">{{ currentShort()?.title ?? currentRow()?.title }}</h2>
+
+            <!-- Retention sparkline -->
+            @if (currentShort()?.analytics?.retention_curve?.length) {
+              <section class="drawer-section">
+                <h3 class="drawer-h">Retention</h3>
+                <div class="retention-meta">
+                  <span><strong>Avg view %:</strong> {{ formatPct(currentShort()?.analytics?.avg_view_percentage) }}</span>
+                  @if (currentShort()?.analytics?.estimated_minutes_watched != null) {
+                    <span><strong>Watch min:</strong> {{ formatNumber(currentShort()?.analytics?.estimated_minutes_watched) }}</span>
+                  }
+                </div>
+                <svg class="retention-chart" viewBox="0 0 460 110" preserveAspectRatio="none">
+                  <path class="retention-area" [attr.d]="retentionAreaPath(currentShort()!.analytics!.retention_curve!)" />
+                  <line class="retention-ref"
+                        [attr.x1]="sparkPad.l"
+                        [attr.x2]="sparkW - sparkPad.r"
+                        [attr.y1]="retentionRefY(currentShort()!.analytics!.retention_curve!)"
+                        [attr.y2]="retentionRefY(currentShort()!.analytics!.retention_curve!)" />
+                  <path class="retention-line" [attr.d]="retentionLinePath(currentShort()!.analytics!.retention_curve!)" />
+                  @for (t of retentionAxisTicks(currentShort()!.analytics!.retention_curve!); track t.pct) {
+                    <text class="ctx-tick" [attr.x]="t.x" [attr.y]="105" text-anchor="middle">{{ t.pct }}%</text>
+                  }
+                </svg>
+                @if (currentShort()?.gemini_analysis?.retention_interpretation; as ri) {
+                  <div class="ri-grid">
+                    @if (ri.opening_drop_off) { <div class="ri-item"><strong>Opening:</strong> {{ ri.opening_drop_off }}</div> }
+                    @if (ri.mid_video) { <div class="ri-item"><strong>Mid:</strong> {{ ri.mid_video }}</div> }
+                    @if (ri.end_behavior) { <div class="ri-item"><strong>End:</strong> {{ ri.end_behavior }}</div> }
+                    @if (ri.avg_view_percentage_read) { <div class="ri-item"><strong>Avg read:</strong> {{ ri.avg_view_percentage_read }}</div> }
+                  </div>
+                }
+              </section>
+            }
+
+            <!-- Title -->
+            @if (currentShort()?.gemini_analysis?.title?.text) {
+              <section class="drawer-section">
+                <h3 class="drawer-h">Title</h3>
+                <p class="quote">{{ currentShort()?.gemini_analysis?.title?.text }}</p>
+                @if (currentShort()?.gemini_analysis?.title?.why_it_worked) {
+                  <p class="prose"><strong>Why it worked:</strong> {{ currentShort()?.gemini_analysis?.title?.why_it_worked }}</p>
+                }
+              </section>
+            }
+
+            <!-- Hook -->
+            @if (currentShort()?.gemini_analysis?.hook?.description) {
+              <section class="drawer-section">
+                <h3 class="drawer-h">Hook</h3>
+                <p class="prose">{{ currentShort()?.gemini_analysis?.hook?.description }}</p>
+                @if (currentShort()?.gemini_analysis?.hook?.why_it_worked) {
+                  <p class="prose"><strong>Why it worked:</strong> {{ currentShort()?.gemini_analysis?.hook?.why_it_worked }}</p>
+                }
+              </section>
+            }
+
+            <!-- Description -->
+            @if (currentShort()?.gemini_analysis?.video_description) {
+              <section class="drawer-section">
+                <h3 class="drawer-h">What's in the video</h3>
+                <p class="prose">{{ currentShort()?.gemini_analysis?.video_description }}</p>
+              </section>
+            }
+
+            <!-- Why it worked / what could be better -->
+            @if (currentShort()?.gemini_analysis?.why_the_video_worked) {
+              <section class="drawer-section">
+                <h3 class="drawer-h drawer-h--good">↑ What worked</h3>
+                <p class="prose">{{ currentShort()?.gemini_analysis?.why_the_video_worked }}</p>
+              </section>
+            }
+            @if (currentShort()?.gemini_analysis?.what_could_have_been_better) {
+              <section class="drawer-section">
+                <h3 class="drawer-h drawer-h--bad">↓ What could be better</h3>
+                <p class="prose">{{ currentShort()?.gemini_analysis?.what_could_have_been_better }}</p>
+              </section>
+            }
+
+            <!-- Attribution -->
+            @if (currentShort()?.gemini_analysis?.attribution; as a) {
+              <section class="drawer-section">
+                <h3 class="drawer-h">Attribution</h3>
+                <div class="attr-grid">
+                  @for (item of objectEntries(a); track item.key) {
+                    @if (item.value && item.value.claim) {
+                      <div class="attr-card">
+                        <div class="attr-key">{{ prettyAxis(item.key) }}
+                          <span class="conf-pill" [ngClass]="confidenceClass(item.value.confidence)">{{ item.value.confidence ?? '—' }}</span>
+                        </div>
+                        <div class="attr-claim">{{ item.value.claim }}</div>
+                        @if (item.value.evidence) {
+                          <div class="attr-evidence"><em>Evidence:</em> {{ item.value.evidence }}</div>
+                        }
+                      </div>
+                    }
+                  }
+                </div>
+              </section>
+            }
+
+            <!-- Tags -->
+            @if (currentTags().length) {
+              <section class="drawer-section">
+                <h3 class="drawer-h">Tags</h3>
+                <div class="tag-axes">
+                  @for (axis of currentTags(); track axis.axis) {
+                    <div class="tag-axis">
+                      <div class="tag-axis-label">{{ prettyAxis(axis.axis) }}</div>
+                      <div class="tag-chips">
+                        @for (t of axis.values; track t) {
+                          <span class="tag-chip">{{ t }}</span>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              </section>
+            }
+
+            <!-- Tailwind hypothesis -->
+            @if (currentTailwind()) {
+              <section class="drawer-section">
+                <h3 class="drawer-h">Tailwind hypothesis</h3>
+                <pre class="raw-json raw-json--inline">{{ currentTailwind() | json }}</pre>
+              </section>
+            }
+          </div>
         }
       }
     </div>

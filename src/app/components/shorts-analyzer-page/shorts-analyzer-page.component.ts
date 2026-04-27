@@ -67,7 +67,112 @@ type AnalysisFilter = 'missing' | 'schema_mismatch' | 'model_mismatch' | 'prompt
 type AnalyticsFilter = 'missing';
 type TailwindFilter = 'missing' | 'schema_mismatch' | 'model_mismatch' | 'prompt_mismatch';
 
-type ViewState = 'list' | 'videos' | 'raw';
+type ViewState = 'list' | 'videos' | 'video' | 'raw' | 'synthesis' | 'context';
+
+// ── Raw shapes from on-disk JSON ────────────────────────────────────────────
+interface RetentionPoint { pct: number; watch_ratio: number; }
+
+interface AnalyticsBlock {
+  breakout_score?: number;
+  avg_view_percentage?: number;
+  estimated_minutes_watched?: number;
+  retention_curve?: RetentionPoint[];
+}
+
+interface AttributionClaim {
+  claim?: string;
+  evidence?: string;
+  confidence?: 'low' | 'medium' | 'high' | string;
+}
+
+interface RetentionInterpretation {
+  opening_drop_off?: string;
+  mid_video?: string;
+  end_behavior?: string;
+  avg_view_percentage_read?: string;
+}
+
+interface GeminiAnalysis {
+  title?: { text?: string; why_it_worked?: string };
+  hook?: { description?: string; why_it_worked?: string };
+  video_description?: string;
+  why_the_video_worked?: string;
+  what_could_have_been_better?: string;
+  retention_interpretation?: RetentionInterpretation;
+  attribution?: {
+    replicable_craft?: AttributionClaim;
+    borrowed_equity?: AttributionClaim;
+    channel_specific_equity?: AttributionClaim;
+    probable_external_tailwind?: AttributionClaim;
+  };
+  tags?: Record<string, string[]>;
+}
+
+interface CorpusShort {
+  rank: number;
+  video_id: string;
+  url: string;
+  title: string;
+  views: number;
+  published_date: string;
+  duration_seconds?: number;
+  breakout_score: number | null;
+  analytics?: AnalyticsBlock | null;
+  gemini_analysis?: GeminiAnalysis | null;
+}
+
+interface CorpusRaw {
+  metadata?: { channel_url?: string; total_shorts_analyzed?: number; gemini_model?: string };
+  shorts: CorpusShort[];
+}
+
+interface SynthesisRaw {
+  metadata?: { generated_at?: string; gemini_model?: string; total_shorts?: number; small_corpus_warning?: boolean };
+  narrative?: {
+    top_quintile_signature?: string;
+    bottom_quintile_signature?: string;
+    load_bearing_patterns?: string;
+    conditional_insights?: string;
+    cautions?: string;
+  };
+  corpus_stats?: {
+    total_shorts?: number;
+    breakout_score?: { n: number; min: number; max: number; mean: number; median: number };
+    views?:          { n: number; min: number; max: number; mean: number; median: number };
+  };
+  quintiles?: {
+    top_threshold?: number; bottom_threshold?: number;
+    n_top?: number; n_bottom?: number;
+    top_video_ids?: string[]; bottom_video_ids?: string[];
+  };
+  tag_frequencies?: Record<string, Record<string, {
+    overall: { count: number; rate: number };
+    top_quintile: { count: number; rate: number };
+    bottom_quintile: { count: number; rate: number };
+    lift_top_vs_overall: number;
+    lift_bottom_vs_overall: number;
+    avg_breakout_score_when_present: number;
+  }>>;
+  unique_to_breakouts?: Array<{ axis: string; tag: string; overall_rate: number; n_overall: number; avg_breakout_when_present: number }>;
+  absent_from_breakouts?: Array<{ axis: string; tag: string; overall_rate: number; n_overall: number; avg_breakout_when_present: number }>;
+  shared_baseline_traits?: Array<{ axis: string; tag: string; top_rate: number; bottom_rate: number; overall_rate: number }>;
+  conditional_patterns?: Array<{
+    when: { axis: string; tag: string };
+    with: { axis: string; tag: string };
+    mean_breakout_when_A: number;
+    mean_breakout_when_A_and_B: number;
+    mean_breakout_when_A_not_B: number;
+    lift_B_given_A: number;
+    n_A: number; n_A_and_B: number; n_A_not_B: number;
+  }>;
+}
+
+interface ContextRaw {
+  built_at?: string;
+  overall_median?: number;
+  monthly_medians?: Record<string, number>;
+  videos?: Record<string, unknown>;
+}
 
 @Component({
   selector: 'app-shorts-analyzer-page',
@@ -103,6 +208,18 @@ export class ShortsAnalyzerPageComponent extends PollingComponent {
   rawJson         = signal<unknown>(null);
   loadingFile     = signal(false);
   selectedIds     = signal<Set<string>>(new Set());
+
+  // Per-file payloads loaded for the structured renderers
+  corpusRaw      = signal<CorpusRaw | null>(null);
+  tailwindRaw    = signal<Record<string, unknown> | null>(null);
+  synthesisData  = signal<SynthesisRaw | null>(null);
+  contextData    = signal<ContextRaw | null>(null);
+
+  // Active video (in-panel detail view)
+  currentVideoId = signal<string | null>(null);
+
+  // Synthesis dashboard sub-controls
+  synthesisActiveAxis = signal<string | null>(null);
 
   // Rerun options (per-request flags)
   tailwindIncludeAll       = signal(false);
@@ -262,8 +379,16 @@ export class ShortsAnalyzerPageComponent extends PollingComponent {
         // Auto-refresh the open view after a rerun completes
         const f = this.selectedFile();
         if (f) {
-          if (this.viewState() === 'videos') await this.loadVideos(f);
-          else if (this.viewState() === 'raw') await this.loadRaw(f);
+          const v = this.viewState();
+          if (v === 'videos' || v === 'video') {
+            await Promise.all([this.loadVideos(f), this.loadCorpusRaw(f), this.loadSiblingTailwind(f)]);
+          } else if (v === 'synthesis') {
+            await this.loadSynthesis(f);
+          } else if (v === 'context') {
+            await this.loadContext(f);
+          } else if (v === 'raw') {
+            await this.loadRaw(f);
+          }
         }
         await this.refreshFiles();
       }
@@ -300,10 +425,18 @@ export class ShortsAnalyzerPageComponent extends PollingComponent {
   async openFile(file: ResultFile) {
     this.selectedFile.set(file);
     this.selectedIds.set(new Set());
+    this.currentVideoId.set(null);
+    if (this.viewState() === 'video') this.viewState.set('videos');
     const kind = this.fileKind(file.name);
     if (kind === 'main') {
       this.viewState.set('videos');
-      await this.loadVideos(file);
+      await Promise.all([this.loadVideos(file), this.loadCorpusRaw(file), this.loadSiblingTailwind(file)]);
+    } else if (kind === 'synthesis') {
+      this.viewState.set('synthesis');
+      await this.loadSynthesis(file);
+    } else if (kind === 'context') {
+      this.viewState.set('context');
+      await this.loadContext(file);
     } else {
       this.viewState.set('raw');
       await this.loadRaw(file);
@@ -315,6 +448,43 @@ export class ShortsAnalyzerPageComponent extends PollingComponent {
     this.videosResponse.set(null);
     const res = await fetch(`/shorts-analyzer/videos?output=${encodeURIComponent(file.name)}`).catch(() => null);
     if (res?.ok) this.videosResponse.set(await res.json());
+    this.loadingFile.set(false);
+  }
+
+  async loadCorpusRaw(file: ResultFile) {
+    this.corpusRaw.set(null);
+    const res = await fetch(`/shorts-analyzer/results/read?name=${encodeURIComponent(file.name)}`).catch(() => null);
+    if (res?.ok) this.corpusRaw.set(await res.json() as CorpusRaw);
+  }
+
+  // Try to load <base>.tailwind.json if it exists; silent on miss.
+  async loadSiblingTailwind(file: ResultFile) {
+    this.tailwindRaw.set(null);
+    const base = this.baseHandle(file.name);
+    const tailwindName = `${base}.tailwind.json`;
+    if (!this.files().some(f => f.name === tailwindName)) return;
+    const res = await fetch(`/shorts-analyzer/results/read?name=${encodeURIComponent(tailwindName)}`).catch(() => null);
+    if (res?.ok) this.tailwindRaw.set(await res.json() as Record<string, unknown>);
+  }
+
+  async loadSynthesis(file: ResultFile) {
+    this.loadingFile.set(true);
+    this.synthesisData.set(null);
+    const res = await fetch(`/shorts-analyzer/results/read?name=${encodeURIComponent(file.name)}`).catch(() => null);
+    if (res?.ok) {
+      const data = await res.json() as SynthesisRaw;
+      this.synthesisData.set(data);
+      const axes = Object.keys(data.tag_frequencies ?? {});
+      if (axes.length) this.synthesisActiveAxis.set(axes[0]);
+    }
+    this.loadingFile.set(false);
+  }
+
+  async loadContext(file: ResultFile) {
+    this.loadingFile.set(true);
+    this.contextData.set(null);
+    const res = await fetch(`/shorts-analyzer/results/read?name=${encodeURIComponent(file.name)}`).catch(() => null);
+    if (res?.ok) this.contextData.set(await res.json() as ContextRaw);
     this.loadingFile.set(false);
   }
 
@@ -335,7 +505,12 @@ export class ShortsAnalyzerPageComponent extends PollingComponent {
     this.selectedFile.set(null);
     this.videosResponse.set(null);
     this.rawJson.set(null);
+    this.corpusRaw.set(null);
+    this.tailwindRaw.set(null);
+    this.synthesisData.set(null);
+    this.contextData.set(null);
     this.selectedIds.set(new Set());
+    this.currentVideoId.set(null);
     this._autoOpened = true;   // user chose the file list; don't auto-bounce them out of it
     this.refreshFiles();
   }
@@ -515,6 +690,192 @@ export class ShortsAnalyzerPageComponent extends PollingComponent {
     }
   }
 
+  // ── Breadcrumbs ────────────────────────────────────────────────────────────
+  breadcrumbs = computed<Array<{ label: string; sub?: string; click?: () => void; current?: boolean }>>(() => {
+    const crumbs: Array<{ label: string; sub?: string; click?: () => void; current?: boolean }> = [];
+    const v = this.viewState();
+    const file = this.selectedFile();
+
+    crumbs.push({
+      label: 'Output Files',
+      click: v === 'list' ? undefined : () => this.backToFiles(),
+      current: v === 'list',
+    });
+
+    if (file && v !== 'list') {
+      const kind = this.fileKind(file.name);
+      const isVideo = v === 'video';
+      crumbs.push({
+        label: file.name,
+        sub: this.kindLabel(kind),
+        click: isVideo ? () => this.backToVideos() : undefined,
+        current: !isVideo,
+      });
+    }
+
+    if (v === 'video') {
+      const title = this.currentShort()?.title ?? this.currentRow()?.title ?? this.currentVideoId() ?? '';
+      crumbs.push({
+        label: title,
+        sub: this.currentVideoId() ?? undefined,
+        current: true,
+      });
+    }
+
+    return crumbs;
+  });
+
+  // ── Video detail view ──────────────────────────────────────────────────────
+  openVideo(videoId: string) {
+    this.currentVideoId.set(videoId);
+    this.viewState.set('video');
+  }
+
+  backToVideos() {
+    this.currentVideoId.set(null);
+    this.viewState.set('videos');
+  }
+
+  currentShort = computed<CorpusShort | null>(() => {
+    const id = this.currentVideoId();
+    if (!id) return null;
+    return this.corpusRaw()?.shorts.find(s => s.video_id === id) ?? null;
+  });
+
+  currentRow = computed<VideoRow | null>(() => {
+    const id = this.currentVideoId();
+    if (!id) return null;
+    return this.videosResponse()?.videos.find(v => v.video_id === id) ?? null;
+  });
+
+  currentTailwind = computed<unknown | null>(() => {
+    const id = this.currentVideoId();
+    if (!id) return null;
+    const tw = this.tailwindRaw();
+    if (!tw) return null;
+    if (typeof tw === 'object' && id in tw) return (tw as Record<string, unknown>)[id];
+    const byVideo = (tw as { videos?: Record<string, unknown>; per_video?: Record<string, unknown> });
+    return byVideo.videos?.[id] ?? byVideo.per_video?.[id] ?? null;
+  });
+
+  currentTags = computed<Array<{ axis: string; values: string[] }>>(() => {
+    const tags = this.currentShort()?.gemini_analysis?.tags ?? {};
+    return Object.entries(tags)
+      .filter(([, v]) => Array.isArray(v) && v.length > 0)
+      .map(([axis, values]) => ({ axis, values: values as string[] }));
+  });
+
+  // Open a video from the synthesis view; switches to corpus view if needed.
+  async jumpToVideoFromSynthesis(videoId: string) {
+    const file = this.selectedFile();
+    if (!file) return;
+    const corpusName = `${this.baseHandle(file.name)}.json`;
+    const corpusFile = this.files().find(f => f.name === corpusName);
+    if (!corpusFile) return;
+    await this.openFile(corpusFile);
+    this.openVideo(videoId);
+  }
+
+  // ── Retention sparkline (plain SVG) ────────────────────────────────────────
+  readonly sparkW = 460;
+  readonly sparkH = 110;
+  readonly sparkPad = { l: 28, r: 8, t: 6, b: 16 };
+
+  sparkScale(curve: RetentionPoint[]) {
+    const xs = curve.map(p => p.pct);
+    const ys = curve.map(p => p.watch_ratio);
+    const xMin = Math.min(...xs, 0), xMax = Math.max(...xs, 100);
+    const yMax = Math.max(...ys, 1.05);
+    const yMin = 0;
+    const innerW = this.sparkW - this.sparkPad.l - this.sparkPad.r;
+    const innerH = this.sparkH - this.sparkPad.t - this.sparkPad.b;
+    const x = (pct: number) => this.sparkPad.l + ((pct - xMin) / (xMax - xMin)) * innerW;
+    const y = (r: number)   => this.sparkPad.t + (1 - (r - yMin) / (yMax - yMin)) * innerH;
+    return { x, y, xMin, xMax, yMin, yMax, innerW, innerH };
+  }
+
+  retentionLinePath(curve: RetentionPoint[]): string {
+    if (!curve?.length) return '';
+    const { x, y } = this.sparkScale(curve);
+    return curve.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.pct).toFixed(1)},${y(p.watch_ratio).toFixed(1)}`).join(' ');
+  }
+
+  retentionAreaPath(curve: RetentionPoint[]): string {
+    if (!curve?.length) return '';
+    const { x, y, innerH } = this.sparkScale(curve);
+    const baseY = this.sparkPad.t + innerH;
+    const top = curve.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.pct).toFixed(1)},${y(p.watch_ratio).toFixed(1)}`).join(' ');
+    const last = curve[curve.length - 1];
+    const first = curve[0];
+    return `${top} L${x(last.pct).toFixed(1)},${baseY.toFixed(1)} L${x(first.pct).toFixed(1)},${baseY.toFixed(1)} Z`;
+  }
+
+  retentionRefY(curve: RetentionPoint[]): number {
+    return this.sparkScale(curve).y(1.0);
+  }
+
+  retentionAxisTicks(curve: RetentionPoint[]): Array<{ pct: number; x: number }> {
+    if (!curve?.length) return [];
+    const { x } = this.sparkScale(curve);
+    return [0, 25, 50, 75, 100].map(p => ({ pct: p, x: x(p) }));
+  }
+
+  // ── Synthesis helpers ──────────────────────────────────────────────────────
+  setSynthesisAxis(axis: string) { this.synthesisActiveAxis.set(axis); }
+
+  synthesisAxes = computed<string[]>(() => Object.keys(this.synthesisData()?.tag_frequencies ?? {}));
+
+  synthesisAxisTags = computed<Array<{
+    tag: string;
+    overall_count: number; overall_rate: number;
+    top_count: number; top_rate: number;
+    bottom_count: number; bottom_rate: number;
+    lift_top: number; lift_bottom: number;
+    avg_breakout: number;
+  }>>(() => {
+    const ax = this.synthesisActiveAxis();
+    const data = this.synthesisData()?.tag_frequencies?.[ax ?? ''];
+    if (!data) return [];
+    return Object.entries(data)
+      .map(([tag, v]) => ({
+        tag,
+        overall_count: v.overall.count, overall_rate: v.overall.rate,
+        top_count:     v.top_quintile.count, top_rate: v.top_quintile.rate,
+        bottom_count:  v.bottom_quintile.count, bottom_rate: v.bottom_quintile.rate,
+        lift_top:      v.lift_top_vs_overall,
+        lift_bottom:   v.lift_bottom_vs_overall,
+        avg_breakout:  v.avg_breakout_score_when_present,
+      }))
+      .sort((a, b) => b.lift_top - a.lift_top);
+  });
+
+  conditionalSorted = computed(() => {
+    const rows = this.synthesisData()?.conditional_patterns ?? [];
+    return [...rows].sort((a, b) => b.lift_B_given_A - a.lift_B_given_A);
+  });
+
+  // ── Context helpers ────────────────────────────────────────────────────────
+  monthlyMediansSorted = computed<Array<{ month: string; median: number }>>(() => {
+    const m = this.contextData()?.monthly_medians ?? {};
+    return Object.entries(m).map(([month, median]) => ({ month, median: median as number }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+  });
+
+  contextChartPath(): { line: string; area: string; ticks: Array<{ x: number; label: string }>; yMax: number } {
+    const points = this.monthlyMediansSorted();
+    if (!points.length) return { line: '', area: '', ticks: [], yMax: 0 };
+    const w = 460, h = 110, padL = 36, padR = 8, padT = 6, padB = 18;
+    const innerW = w - padL - padR, innerH = h - padT - padB;
+    const yMax = Math.max(...points.map(p => p.median), 1) * 1.1;
+    const x = (i: number) => padL + (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW);
+    const y = (v: number) => padT + (1 - v / yMax) * innerH;
+    const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(p.median).toFixed(1)}`).join(' ');
+    const baseY = padT + innerH;
+    const area = `${line} L${x(points.length - 1).toFixed(1)},${baseY.toFixed(1)} L${x(0).toFixed(1)},${baseY.toFixed(1)} Z`;
+    const ticks = points.map((p, i) => ({ x: x(i), label: p.month.slice(2) }));   // YYYY-MM → YY-MM
+    return { line, area, ticks, yMax };
+  }
+
   // ── Formatting ─────────────────────────────────────────────────────────────
   formatSize(bytes: number): string {
     if (bytes < 1024) return `${bytes}B`;
@@ -553,5 +914,41 @@ export class ShortsAnalyzerPageComponent extends PollingComponent {
 
   kindIcon(kind: FileKind): string {
     return ({ main: '📊', synthesis: '📝', tailwind: '💨', context: '🧩', other: '📄' })[kind];
+  }
+
+  formatPct(v: number | null | undefined, digits = 1): string {
+    if (v == null) return '—';
+    return `${v.toFixed(digits)}%`;
+  }
+
+  formatRatio(v: number | null | undefined, digits = 2): string {
+    if (v == null) return '—';
+    return v.toFixed(digits);
+  }
+
+  formatNumber(v: number | null | undefined): string {
+    if (v == null) return '—';
+    return v.toLocaleString();
+  }
+
+  // Pretty-print a tag axis name: "title_mechanics" → "Title Mechanics"
+  prettyAxis(axis: string): string {
+    return axis.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  confidenceClass(c: string | undefined): string {
+    if (c === 'high')   return 'conf-high';
+    if (c === 'medium') return 'conf-med';
+    if (c === 'low')    return 'conf-low';
+    return 'conf-unknown';
+  }
+
+  isNonEmpty(v: unknown): boolean {
+    return v != null && v !== '';
+  }
+
+  objectEntries<T>(o: Record<string, T> | undefined | null): Array<{ key: string; value: T }> {
+    if (!o) return [];
+    return Object.entries(o).map(([key, value]) => ({ key, value }));
   }
 }
