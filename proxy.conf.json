@@ -4,5 +4,10 @@
     "target": "http://localhost:9020",
     "secure": false,
     "pathRewrite": { "^/subtitler": "" }
+  },
+  "/shorts-analyzer": {
+    "target": "http://localhost:9021",
+    "secure": false,
+    "pathRewrite": { "^/shorts-analyzer": "" }
   }
 }

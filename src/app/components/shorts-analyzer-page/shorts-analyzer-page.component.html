@@ -1,0 +1,424 @@
+<div class="page-container">
+  <div class="page-header">
+    <div class="header-left">
+      <a routerLink="/" class="back-btn"><span>←</span><span>Hub</span></a>
+      <div class="title-block">
+        <h1 class="page-title"><span class="icon" style="color: #38bdf8;">📊</span> Shorts Analyzer</h1>
+        <span class="sub-label">Analyze a channel's top Shorts with Gemini</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="status-strip" [style.--sc]="statusMeta().color">
+        @if (isStarting()) { <span class="strip-spinner"></span> }
+        @else { <span>{{ statusMeta().icon }}</span> }
+        <span>{{ statusMeta().label }}</span>
+        @if (serviceStatus()?.pid) { <span class="strip-pid">PID {{ serviceStatus()!.pid }}</span> }
+      </div>
+      <span class="last-upd">{{ lastUpdated() }}</span>
+    </div>
+  </div>
+
+  @if (!launcherOnline()) {
+    <div class="banner-warn">⚠ Launcher offline — start it with <code>npm start</code></div>
+  } @else if (!apiOnline() && !isStarting()) {
+    <div class="banner-info">Shorts Analyzer API is offline. Click <strong>▶ Start API</strong> to bring it online.</div>
+  }
+
+  <div class="page-panels">
+
+    <div class="left-panel">
+
+      <!-- Service control -->
+      <section class="section controls-section">
+        <div class="ctrl-row">
+          <button class="btn btn-run"
+                  [disabled]="!launcherOnline() || isRunning() || isStarting() || actionPending()"
+                  (click)="serviceAction('start')">
+            ▶ Start API
+          </button>
+          <button class="btn btn-stop"
+                  [disabled]="!launcherOnline() || (!isRunning() && !isStarting()) || actionPending()"
+                  (click)="serviceAction('stop')">
+            ■ Stop
+          </button>
+          <button class="btn btn-run"
+                  [disabled]="!launcherOnline() || actionPending()"
+                  (click)="serviceAction('restart')">
+            ↻ Restart
+          </button>
+        </div>
+      </section>
+
+      <!-- Start new analysis (Phases 1+2) -->
+      <section class="section">
+        <h2 class="section-title">New Analysis <span class="section-hint">Fetch + analyze (Phases 1–2)</span></h2>
+        <div class="form-stack">
+          <div class="channel-display">
+            <span class="channel-display-label">Channel</span>
+            <span class="channel-display-value">&#64;PeepingOtter</span>
+          </div>
+          <label class="form-field form-field--inline">
+            <span class="form-label">Max Shorts</span>
+            <input type="number" class="form-input form-input--num" min="1" max="1000"
+                   [ngModel]="maxShorts()"
+                   (ngModelChange)="maxShorts.set(+$event)"
+                   [disabled]="!apiOnline() || jobRunning()" />
+          </label>
+          <div class="ctrl-row">
+            <button class="btn btn-run"
+                    [disabled]="!apiOnline() || jobRunning() || startingJob()"
+                    (click)="startAnalysis()">
+              @if (startingJob()) { <span class="btn-spin"></span> Starting… }
+              @else { ▶ Start Analysis }
+            </button>
+            <button class="btn btn-stop"
+                    [disabled]="!apiOnline() || !jobRunning()"
+                    (click)="stopJob()">
+              ■ Stop Job
+            </button>
+          </div>
+          @if (formError()) { <div class="error-msg">{{ formError() }}</div> }
+        </div>
+      </section>
+
+      <!-- Progress -->
+      @if (jobRunning() || jobStatus()?.progress?.phase === 'done' || jobStatus()?.progress?.phase === 'error') {
+        <section class="section">
+          <h2 class="section-title">Current Job</h2>
+          <div class="job-row">
+            <span class="job-kind">{{ jobStatus()?.current_job?.kind ?? jobStatus()?.progress?.phase ?? 'idle' }}</span>
+            @if (jobStatus()?.current_job?.output) {
+              <span class="job-meta">→ {{ jobStatus()?.current_job?.output }}</span>
+            }
+          </div>
+          @if (jobStatus()?.progress?.total) {
+            <div class="progress-bar">
+              <div class="progress-fill" [style.width.%]="progressValue() * 100"></div>
+            </div>
+            <div class="progress-label">
+              {{ jobStatus()?.progress?.current }} / {{ jobStatus()?.progress?.total }}
+              @if (jobStatus()?.progress?.current_title) {
+                · <span class="progress-title">{{ jobStatus()?.progress?.current_title }}</span>
+              }
+            </div>
+          }
+          @if (jobStatus()?.last_error) {
+            <div class="error-msg">{{ jobStatus()?.last_error }}</div>
+          }
+        </section>
+      }
+
+      <!-- Logs -->
+      <section class="log-section">
+        <div class="log-header">
+          <div class="log-header-left">
+            <h2 class="section-title" style="margin:0">Analyzer Output</h2>
+            @if (jobRunning()) { <span class="live-badge">● live</span> }
+          </div>
+          <div class="log-header-right">
+            <button class="log-btn" (click)="poll()">↻</button>
+            <button class="log-btn log-btn--clear" (click)="clearLogs()">✕</button>
+          </div>
+        </div>
+        <div class="log-body">
+          @for (line of logs(); track $index) {
+            <div class="log-line" [class.err]="isErr(line)" [class.ok]="isOk(line)" [class.warn]="isWarn(line)">{{ line }}</div>
+          }
+          @if (!logs().length) { <div class="log-empty">No output yet. Start the API, then kick off an analysis.</div> }
+        </div>
+      </section>
+    </div>
+
+    <!-- Right panel: files / videos / raw -->
+    <div class="right-panel">
+      <div class="viewer-header">
+        @if (viewState() !== 'list') {
+          <button class="viewer-back-btn" (click)="backToFiles()">← Back</button>
+          <div class="viewer-title-group">
+            <span class="viewer-title">
+              <span class="kind-badge" [attr.data-kind]="fileKind(selectedFile()!.name)">
+                {{ kindIcon(fileKind(selectedFile()!.name)) }} {{ kindLabel(fileKind(selectedFile()!.name)) }}
+              </span>
+              {{ selectedFile()?.name }}
+            </span>
+            <span class="viewer-path">{{ selectedFile()?.path }}</span>
+          </div>
+          <button class="viewer-refresh-btn" (click)="downloadFile(selectedFile()!)" title="Download JSON">⬇ Download</button>
+          <button class="btn-erase" (click)="openDeleteModal()" title="Delete this file">🗑 Delete</button>
+        } @else {
+          <span class="viewer-title">Output Files</span>
+          <button class="viewer-refresh-btn" [disabled]="!apiOnline()" (click)="refreshFiles()">↻ Refresh</button>
+        }
+      </div>
+
+      <!-- File list view -->
+      @if (viewState() === 'list') {
+        <div class="data-file-list">
+          @for (group of groupedFiles(); track group.base) {
+            <div class="file-group">
+              @if (group.main; as m) {
+                <button class="data-file-row" (click)="openFile(m)">
+                  <span class="data-file-icon">{{ kindIcon('main') }}</span>
+                  <div class="data-file-info">
+                    <span class="data-file-label">
+                      {{ m.name }}
+                      <span class="kind-badge" data-kind="main">Corpus</span>
+                    </span>
+                    <span class="data-file-meta">{{ formatSize(m.size) }} · {{ formatDate(m.modified) }}</span>
+                  </div>
+                  <span class="data-file-arrow">›</span>
+                </button>
+              } @else {
+                <div class="data-file-row data-file-row--ghost">
+                  <span class="data-file-icon">{{ kindIcon('main') }}</span>
+                  <div class="data-file-info">
+                    <span class="data-file-label">{{ group.base }}.json</span>
+                    <span class="data-file-missing">Main corpus file missing</span>
+                  </div>
+                </div>
+              }
+              @for (sib of group.siblings; track sib.file.name) {
+                <button class="data-file-row data-file-row--sibling" (click)="openFile(sib.file)">
+                  <span class="data-file-icon">{{ kindIcon(sib.kind) }}</span>
+                  <div class="data-file-info">
+                    <span class="data-file-label">
+                      {{ sib.file.name }}
+                      <span class="kind-badge" [attr.data-kind]="sib.kind">{{ kindLabel(sib.kind) }}</span>
+                    </span>
+                    <span class="data-file-meta">{{ formatSize(sib.file.size) }} · {{ formatDate(sib.file.modified) }}</span>
+                  </div>
+                  <span class="data-file-arrow">›</span>
+                </button>
+              }
+            </div>
+          }
+          @if (!groupedFiles().length) {
+            <div class="viewer-empty">
+              <span class="viewer-empty-icon">📭</span>
+              @if (!apiOnline()) {
+                <span>Start the API to see output files.</span>
+              } @else {
+                <span>No analyses yet — kick off your first one from the left panel.</span>
+                <span class="empty-hint">All rerun controls (Analytics · Analysis · Tailwind · Synthesis) appear here once a corpus file exists.</span>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Corpus (main file) detail view -->
+      @if (viewState() === 'videos') {
+        @if (loadingFile()) {
+          <div class="viewer-empty"><span class="viewer-empty-icon">⏳</span><span>Loading…</span></div>
+        } @else if (!videosResponse()) {
+          <div class="viewer-empty"><span class="viewer-empty-icon">⚠</span><span>Could not load file.</span></div>
+        } @else {
+          <!-- Rerun toolbar -->
+          <div class="rerun-toolbar">
+            <div class="rerun-group">
+              <span class="rerun-group-label">Analytics <span class="group-hint">Phase 1</span></span>
+              <button class="pill-btn"
+                      [disabled]="!apiOnline() || jobRunning() || staleCounts().analytics_missing === 0"
+                      (click)="rerunAnalyticsMissing()">
+                Missing ({{ staleCounts().analytics_missing }})
+              </button>
+              <button class="pill-btn"
+                      [disabled]="!apiOnline() || jobRunning() || selectedCount() === 0"
+                      (click)="rerunAnalyticsSelected()">
+                Selected ({{ selectedCount() }})
+              </button>
+            </div>
+
+            <div class="rerun-group">
+              <span class="rerun-group-label">Analysis <span class="group-hint">Phase 2 · expensive</span></span>
+              <button class="pill-btn pill-btn--caution"
+                      [disabled]="!apiOnline() || jobRunning() || staleCounts().analysis_missing === 0"
+                      (click)="rerunAnalysisFilter('missing')">
+                Missing ({{ staleCounts().analysis_missing }})
+              </button>
+              <button class="pill-btn pill-btn--caution"
+                      [disabled]="!apiOnline() || jobRunning() || staleCounts().analysis_schema_mismatch === 0"
+                      (click)="rerunAnalysisFilter('schema_mismatch')">
+                Schema ({{ staleCounts().analysis_schema_mismatch }})
+              </button>
+              <button class="pill-btn pill-btn--caution"
+                      [disabled]="!apiOnline() || jobRunning() || staleCounts().analysis_model_mismatch === 0"
+                      (click)="rerunAnalysisFilter('model_mismatch')">
+                Model ({{ staleCounts().analysis_model_mismatch }})
+              </button>
+              <button class="pill-btn pill-btn--caution"
+                      [disabled]="!apiOnline() || jobRunning() || staleCounts().analysis_prompt_mismatch === 0"
+                      (click)="rerunAnalysisFilter('prompt_mismatch')">
+                Prompt ({{ staleCounts().analysis_prompt_mismatch }})
+              </button>
+              <button class="pill-btn pill-btn--caution"
+                      [disabled]="!apiOnline() || jobRunning() || selectedCount() === 0"
+                      (click)="rerunAnalysisSelected()">
+                Selected ({{ selectedCount() }})
+              </button>
+              <button class="pill-btn pill-btn--danger"
+                      [disabled]="!apiOnline() || jobRunning() || staleCounts().total === 0"
+                      (click)="openFullRerunModal()"
+                      title="Re-analyze every video in the corpus">
+                Full ({{ staleCounts().total }})
+              </button>
+            </div>
+
+            <div class="rerun-group">
+              <span class="rerun-group-label">Tailwind <span class="group-hint">Phase 5</span></span>
+              <label class="toggle">
+                <input type="checkbox"
+                       [checked]="tailwindIncludeAll()"
+                       (change)="tailwindIncludeAll.set($any($event.target).checked)" />
+                include_all
+              </label>
+              <label class="toggle">
+                <input type="checkbox"
+                       [checked]="tailwindUseTrends()"
+                       (change)="tailwindUseTrends.set($any($event.target).checked)" />
+                use_trends
+              </label>
+              <button class="pill-btn"
+                      [disabled]="!apiOnline() || jobRunning()"
+                      (click)="rerunTailwindSweep()">
+                Default sweep
+              </button>
+              <button class="pill-btn"
+                      [disabled]="!apiOnline() || jobRunning() || staleCounts().tailwind_missing === 0"
+                      (click)="rerunTailwindFilter('missing')">
+                Missing ({{ staleCounts().tailwind_missing }})
+              </button>
+              <button class="pill-btn"
+                      [disabled]="!apiOnline() || jobRunning() || staleCounts().tailwind_schema_mismatch === 0"
+                      (click)="rerunTailwindFilter('schema_mismatch')">
+                Schema ({{ staleCounts().tailwind_schema_mismatch }})
+              </button>
+              <button class="pill-btn"
+                      [disabled]="!apiOnline() || jobRunning() || staleCounts().tailwind_model_mismatch === 0"
+                      (click)="rerunTailwindFilter('model_mismatch')">
+                Model ({{ staleCounts().tailwind_model_mismatch }})
+              </button>
+              <button class="pill-btn"
+                      [disabled]="!apiOnline() || jobRunning() || staleCounts().tailwind_prompt_mismatch === 0"
+                      (click)="rerunTailwindFilter('prompt_mismatch')">
+                Prompt ({{ staleCounts().tailwind_prompt_mismatch }})
+              </button>
+              <button class="pill-btn"
+                      [disabled]="!apiOnline() || jobRunning() || selectedCount() === 0"
+                      (click)="rerunTailwindSelected()">
+                Selected ({{ selectedCount() }})
+              </button>
+            </div>
+
+            <div class="rerun-group">
+              <span class="rerun-group-label">Synthesis <span class="group-hint">Phase 4 · corpus-wide</span></span>
+              <label class="toggle">
+                <input type="checkbox"
+                       [checked]="synthesisSkipNarrative()"
+                       (change)="synthesisSkipNarrative.set($any($event.target).checked)" />
+                skip_narrative
+              </label>
+              <button class="pill-btn"
+                      [disabled]="!apiOnline() || jobRunning()"
+                      (click)="rerunSynthesis()">
+                Run
+              </button>
+            </div>
+
+            @if (selectedCount() > 0) {
+              <button class="pill-btn pill-btn--ghost" (click)="clearSelection()">Clear ({{ selectedCount() }})</button>
+            }
+          </div>
+
+          <div class="video-table">
+            <div class="video-row video-row--head">
+              <span class="col-check"></span>
+              <span class="col-title">Title</span>
+              <span class="col-num">Views</span>
+              <span class="col-num">Breakout</span>
+              <span class="col-phase">Analytics</span>
+              <span class="col-phase">Analysis</span>
+              <span class="col-phase">Tailwind</span>
+            </div>
+            @for (v of videosResponse()!.videos; track v.video_id) {
+              <label class="video-row">
+                <span class="col-check">
+                  <input type="checkbox"
+                         [checked]="selectedIds().has(v.video_id)"
+                         (change)="toggleSelect(v.video_id)" />
+                </span>
+                <span class="col-title">
+                  <span class="video-title">{{ v.title }}</span>
+                  <span class="video-id">{{ v.video_id }} · {{ v.published_date }}</span>
+                </span>
+                <span class="col-num">{{ formatViews(v.views) }}</span>
+                <span class="col-num">{{ v.breakout_score != null ? v.breakout_score.toFixed(2) : '—' }}</span>
+                <span class="col-phase">
+                  <span class="phase-pill" [ngClass]="phaseClass(v.phases.analytics)">{{ phaseLabel(v.phases.analytics) }}</span>
+                </span>
+                <span class="col-phase">
+                  <span class="phase-pill" [ngClass]="phaseClass(v.phases.analysis)">{{ phaseLabel(v.phases.analysis) }}</span>
+                </span>
+                <span class="col-phase">
+                  <span class="phase-pill" [ngClass]="phaseClass(v.phases.tailwind)">{{ phaseLabel(v.phases.tailwind) }}</span>
+                </span>
+              </label>
+            }
+            @if (videosResponse()!.videos.length === 0) {
+              <div class="viewer-empty"><span>—</span><span>No videos in this file.</span></div>
+            }
+          </div>
+          <div class="content-footer">{{ videosResponse()!.videos.length }} videos</div>
+        }
+      }
+
+      <!-- Raw JSON viewer (synthesis / tailwind / context) -->
+      @if (viewState() === 'raw') {
+        @if (loadingFile()) {
+          <div class="viewer-empty"><span class="viewer-empty-icon">⏳</span><span>Loading…</span></div>
+        } @else if (rawJson() == null) {
+          <div class="viewer-empty"><span class="viewer-empty-icon">⚠</span><span>Could not load file.</span></div>
+        } @else {
+          <pre class="raw-json">{{ prettyJson() }}</pre>
+        }
+      }
+    </div>
+
+  </div>
+
+  @if (showDeleteModal()) {
+    <div class="modal-overlay" (click)="cancelDelete()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-icon">🗑</div>
+        <h3 class="modal-title">Delete file?</h3>
+        <p class="modal-body">
+          Permanently delete <strong>{{ selectedFile()?.name }}</strong>?<br>
+          This cannot be undone.
+        </p>
+        <div class="modal-actions">
+          <button class="modal-btn modal-btn-cancel" [disabled]="deleting()" (click)="cancelDelete()">Cancel</button>
+          <button class="modal-btn modal-btn-confirm" [disabled]="deleting()" (click)="confirmDelete()">
+            @if (deleting()) { <span class="btn-spin"></span>Deleting… } @else { Delete }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (showFullRerunModal()) {
+    <div class="modal-overlay" (click)="cancelFullRerun()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-icon">⚠</div>
+        <h3 class="modal-title">Re-analyze every video?</h3>
+        <p class="modal-body">
+          This runs Phase 2 on <strong>{{ staleCounts().total }}</strong> videos —
+          one Gemini Pro call + video upload each. Expensive and slow.
+        </p>
+        <div class="modal-actions">
+          <button class="modal-btn modal-btn-cancel" (click)="cancelFullRerun()">Cancel</button>
+          <button class="modal-btn modal-btn-confirm" (click)="confirmFullRerun()">Rerun all</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

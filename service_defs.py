@@ -117,6 +117,18 @@ SERVICE_DEFS: Dict[str, Dict[str, Any]] = {
         "is_gui":       False,
         "color_hint":   "#a855f7",     # purple
     },
+    "shorts_analyzer_api": {
+        "label":        "Shorts Analyzer API",
+        "description":  "Analyzes a channel's top Shorts with Gemini: fetches Analytics, runs per-video analysis, and builds corpus synthesis + tailwind hypotheses",
+        "cmd":          [conda_python("shorts-analyzer"), "-u", "api_server.py"],
+        "cwd":          os.path.join(PARENT_DIR, "shorts_analyzer"),
+        "port":         9021,
+        "health_check": "http",
+        "health_url":   "http://localhost:9021/health",
+        "managed":      True,
+        "is_gui":       False,
+        "color_hint":   "#38bdf8",     # sky
+    },
 
     # ── Template for future projects ──────────────────────────────────────────
     # "my_new_project": {
@@ -137,4 +149,5 @@ BOOT_RETRIES: Dict[str, int] = {
     "simple_auto_subs":     5,
     "simple_auto_subs_api": 12,   # Heavier imports — give it more time
     "youtube_publisher":    8,
+    "shorts_analyzer_api":  12,   # Heavier imports — give it more time
 }

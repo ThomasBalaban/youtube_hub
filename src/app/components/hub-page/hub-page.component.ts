@@ -46,5 +46,12 @@ export class HubPageComponent {
       description: 'Configure the run mode (AI Analysis, Scraper, or Publish), adjust settings, and launch the Playwright browser automation that schedules your draft Shorts.',
       color: '#f87171',
     },
+    {
+      route: '/shorts-analyzer',
+      icon: '📊',
+      title: 'Shorts Analyzer',
+      description: 'Pull a channel\'s top Shorts, score Analytics retention, run Gemini per-video analysis, and generate corpus-level synthesis + tailwind hypotheses.',
+      color: '#38bdf8',
+    },
   ];
 }
