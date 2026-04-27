@@ -17,6 +17,11 @@
         <span>{{ serviceStatusMeta().label }}</span>
         @if (serviceStatus()?.pid) { <span class="strip-pid">PID {{ serviceStatus()!.pid }}</span> }
       </div>
+      <div class="status-strip" [style.--sc]="analyzerMeta().color"
+           [title]="analyzerStatus()?.base_url ?? 'shorts_analyzer bridge'">
+        <span>{{ analyzerMeta().icon }}</span>
+        <span>{{ analyzerMeta().label }}</span>
+      </div>
       @if (serviceStatus()?.status === 'offline' || serviceStatus()?.status === 'unknown') {
         <button class="btn btn-start-api" [disabled]="actionPending() || !launcherOnline()"
                 (click)="serviceAction('start')">▶ Start API</button>

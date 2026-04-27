@@ -29,6 +29,14 @@ interface SubtitlerSettings {
   enable_trimming: boolean;
 }
 
+interface AnalyzerStatus {
+  base_url: string;
+  checked_at: number;
+  connected: boolean;
+  channel_handle: string;
+  channel_files: { analysis: boolean; synthesis: boolean; tailwind: boolean } | null;
+}
+
 interface ServiceStatus {
   id: string;
   status: string;
@@ -69,6 +77,7 @@ export class SubtitlerPageComponent extends PollingComponent {
     output_dir:     '',
     enable_trimming: true,
   });
+  analyzerStatus = signal<AnalyzerStatus | null>(null);
   serviceStatus  = signal<ServiceStatus | null>(null);
   launcherOnline = signal(false);
   apiOnline      = signal(false);
@@ -115,6 +124,17 @@ export class SubtitlerPageComponent extends PollingComponent {
   setSyncOffset(v: number)      { this.settings.update(s => ({ ...s, sync_offset: +v })); }
   setOutputDir(v: string)       { this.settings.update(s => ({ ...s, output_dir: v })); }
   toggleTrimming()              { this.settings.update(s => ({ ...s, enable_trimming: !s.enable_trimming })); }
+
+  // ── Analyzer bridge meta ───────────────────────────────────────────────────
+  analyzerMeta = computed(() => {
+    const a = this.analyzerStatus();
+    if (!a)           return { label: 'Analyzer: unknown',  color: '#6b7280', icon: '?' };
+    if (!a.connected) return { label: 'Analyzer: offline',  color: '#ef4444', icon: '○' };
+    const cf = a.channel_files;
+    const have = cf ? Object.values(cf).filter(Boolean).length : 0;
+    if (have === 0)   return { label: `Analyzer: ${a.channel_handle} (no data)`, color: '#f59e0b', icon: '◌' };
+    return                   { label: `Analyzer: ${a.channel_handle}`,           color: '#34d399', icon: '●' };
+  });
 
   // ── Log helpers ────────────────────────────────────────────────────────────
   isErr  = (l: string) => /error|failed|exception|traceback|fatal|❌/i.test(l);
@@ -169,10 +189,11 @@ export class SubtitlerPageComponent extends PollingComponent {
     }
 
     if (this.apiOnline()) {
-      const [statusRes, filesRes, logsRes] = await Promise.allSettled([
+      const [statusRes, filesRes, logsRes, analyzerRes] = await Promise.allSettled([
         fetch('/subtitler/process/status'),
         fetch('/subtitler/files'),
         fetch('/subtitler/logs?last=200'),
+        fetch('/subtitler/analyzer/status'),
       ]);
       if (statusRes.status === 'fulfilled' && statusRes.value.ok)
         this.processStatus.set(await statusRes.value.json());
@@ -182,9 +203,15 @@ export class SubtitlerPageComponent extends PollingComponent {
         const d = await logsRes.value.json();
         this.logs.set(d.lines ?? []);
       }
+      if (analyzerRes.status === 'fulfilled' && analyzerRes.value.ok)
+        this.analyzerStatus.set(await analyzerRes.value.json());
+      else
+        this.analyzerStatus.set(null);
 
       // Refresh log file list when in list view
       if (this.logViewState() === 'list') await this.refreshLogFiles();
+    } else {
+      this.analyzerStatus.set(null);
     }
 
     this.lastUpdated.set('Updated ' + new Date().toLocaleTimeString());
