@@ -53,5 +53,12 @@ export class HubPageComponent {
       description: 'Pull a channel\'s top Shorts, score Analytics retention, run Gemini per-video analysis, and generate corpus-level synthesis + tailwind hypotheses.',
       color: '#38bdf8',
     },
+    {
+      route: '/strategist',
+      icon: '🧠',
+      title: 'Shorts Strategist',
+      description: 'Deep-think reasoning service: multi-pass title generation, cut planning, special effects, plus strategy-memory linking edits to outcomes and an experiment designer.',
+      color: '#fb923c',
+    },
   ];
 }

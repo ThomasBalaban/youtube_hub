@@ -12,7 +12,7 @@ interface ServiceStatus {
   health_check: string;
 }
 
-const REQUIRED_API_IDS = ['simple_auto_subs_api', 'shorts_analyzer_api'];
+const REQUIRED_API_IDS = ['simple_auto_subs_api', 'shorts_analyzer_api', 'shorts_strategist_api'];
 
 @Component({
   selector: 'app-status-ribbon',
@@ -45,13 +45,14 @@ const REQUIRED_API_IDS = ['simple_auto_subs_api', 'shorts_analyzer_api'];
 
       <div class="ribbon-right">
         <button class="ribbon-btn"
-                (click)="startApis()"
-                [disabled]="!launcherOnline() || busy() || apisReady()">
+                [class.ribbon-btn--stop]="apisReady() && !busy()"
+                (click)="toggleApis()"
+                [disabled]="!launcherOnline() || busy()">
           @if (busy()) {
             <span class="btn-spin"></span>
-            Starting…
+            {{ busyLabel() }}
           } @else if (apisReady()) {
-            APIs running
+            ■ Stop APIs
           } @else {
             ▶ Start APIs
           }
@@ -67,6 +68,7 @@ export class StatusRibbonComponent extends PollingComponent {
   services       = signal<ServiceStatus[]>([]);
   launcherOnline = signal(false);
   busy           = signal(false);
+  busyLabel      = signal('Starting…');
 
   apisReady = () => {
     const svcs = this.services();
@@ -93,9 +95,18 @@ export class StatusRibbonComponent extends PollingComponent {
     }
   }
 
-  async startApis() {
+  async toggleApis() {
     if (this.busy() || !this.launcherOnline()) return;
+    if (this.apisReady()) {
+      await this.stopApis();
+    } else {
+      await this.startApis();
+    }
+  }
+
+  async startApis() {
     this.busy.set(true);
+    this.busyLabel.set('Starting…');
     try {
       const svcs = this.services();
       const toStart = REQUIRED_API_IDS.filter(id => {
@@ -105,6 +116,27 @@ export class StatusRibbonComponent extends PollingComponent {
       await Promise.allSettled(
         toStart.map(id =>
           fetch(`/launcher/services/${id}/start`, { method: 'POST' }),
+        ),
+      );
+      await this.poll();
+      setTimeout(() => this.poll(), 2500);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async stopApis() {
+    this.busy.set(true);
+    this.busyLabel.set('Stopping…');
+    try {
+      const svcs = this.services();
+      const toStop = REQUIRED_API_IDS.filter(id => {
+        const s = svcs.find(x => x.id === id);
+        return s && s.status !== 'offline';
+      });
+      await Promise.allSettled(
+        toStop.map(id =>
+          fetch(`/launcher/services/${id}/stop`, { method: 'POST' }),
         ),
       );
       await this.poll();

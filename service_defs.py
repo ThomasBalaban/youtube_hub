@@ -129,6 +129,18 @@ SERVICE_DEFS: Dict[str, Dict[str, Any]] = {
         "is_gui":       False,
         "color_hint":   "#38bdf8",     # sky
     },
+    "shorts_strategist_api": {
+        "label":        "Shorts Strategist API",
+        "description":  "Deep-think reasoning service for SimpleAutoSubs: title generation, cut planning, special effects, editing-strategy memory, experiment design, and capability roadmap",
+        "cmd":          [conda_python("strategy2"), "-u", "api_server.py"],
+        "cwd":          os.path.join(PARENT_DIR, "shorts_strategist"),
+        "port":         9022,
+        "health_check": "http",
+        "health_url":   "http://localhost:9022/health",
+        "managed":      True,
+        "is_gui":       False,
+        "color_hint":   "#fb923c",     # orange
+    },
 
     # ── Template for future projects ──────────────────────────────────────────
     # "my_new_project": {
@@ -150,4 +162,5 @@ BOOT_RETRIES: Dict[str, int] = {
     "simple_auto_subs_api": 12,   # Heavier imports — give it more time
     "youtube_publisher":    8,
     "shorts_analyzer_api":  12,   # Heavier imports — give it more time
+    "shorts_strategist_api": 12,
 }

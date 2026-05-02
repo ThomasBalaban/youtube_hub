@@ -144,6 +144,17 @@
     opacity: 0.45;
     cursor: not-allowed;
   }
+
+  &.ribbon-btn--stop {
+    border-color: rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.1);
+    color: #f87171;
+
+    &:hover:not(:disabled) {
+      background: rgba(239, 68, 68, 0.18);
+      border-color: rgba(239, 68, 68, 0.6);
+    }
+  }
 }
 
 .btn-spin {

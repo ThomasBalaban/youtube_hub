@@ -52,7 +52,7 @@ http_client: Optional[httpx.AsyncClient] = None
 # Health checks
 # ─────────────────────────────────────────────
 
-async def _http_health(url: str, timeout: float = 2.0) -> bool:
+async def _http_health(url: str, timeout: float = 5.0) -> bool:
     if not http_client:
         return False
     try:

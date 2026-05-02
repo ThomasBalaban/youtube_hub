@@ -5,6 +5,7 @@ import { SubtitlerPageComponent } from './components/subtitler-page/subtitler-pa
 import { BacktrackPageComponent } from './components/backtrack-page/backtrack-page.component';
 import { AutoRunPageComponent } from './components/auto-run-page/auto-run-page.component';
 import { ShortsAnalyzerPageComponent } from './components/shorts-analyzer-page/shorts-analyzer-page.component';
+import { StrategistPageComponent } from './components/strategist-page/strategist-page.component';
 
 export const routes: Routes = [
   { path: 'auto-run',         component: AutoRunPageComponent },
@@ -12,5 +13,6 @@ export const routes: Routes = [
   { path: 'publisher',        component: PublisherPageComponent },
   { path: 'subtitler',        component: SubtitlerPageComponent },
   { path: 'shorts-analyzer',  component: ShortsAnalyzerPageComponent },
+  { path: 'strategist',       component: StrategistPageComponent },
   { path: '**',               component: HubPageComponent },
 ];

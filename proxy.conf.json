@@ -9,5 +9,10 @@
     "target": "http://localhost:9021",
     "secure": false,
     "pathRewrite": { "^/shorts-analyzer": "" }
+  },
+  "/shorts-strategist": {
+    "target": "http://localhost:9022",
+    "secure": false,
+    "pathRewrite": { "^/shorts-strategist": "" }
   }
 }
