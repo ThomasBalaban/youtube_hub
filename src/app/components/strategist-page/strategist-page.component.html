@@ -300,6 +300,12 @@
                         @case ('title_pattern_retro') {
                           <ng-container *ngTemplateOutlet="titlePatternsTpl; context: { p: recPayload() }"></ng-container>
                         }
+                        @case ('capability_gaps') {
+                          <ng-container *ngTemplateOutlet="capabilityGapsTpl; context: { p: recPayload() }"></ng-container>
+                        }
+                        @case ('pre_publish_edit_review') {
+                          <ng-container *ngTemplateOutlet="editReviewTpl; context: { p: recPayload() }"></ng-container>
+                        }
                         @default {
                           <pre class="trace-json">{{ prettyRec() }}</pre>
                         }
@@ -885,6 +891,353 @@
           @for (q of p.open_questions; track q) { <li>{{ q }}</li> }
         </ul>
       </section>
+    }
+  </div>
+</ng-template>
+
+
+<ng-template #capabilityGapsTpl let-p="p">
+  <div class="cg-pane">
+    <!-- Headline -->
+    <section class="sc-headline">
+      <h2 class="sc-h-title">Top capability gaps</h2>
+      <p class="sc-headline-text">{{ p?.headline ?? '—' }}</p>
+      @if (p?.headline_critique) {
+        <div class="sc-critique">
+          <span class="sc-critique-label">critic:</span>
+          <span class="sc-critique-text">{{ p.headline_critique }}</span>
+        </div>
+      }
+      <div class="cg-meta">
+        <span><b>{{ p?.prioritized_gaps?.length ?? 0 }}</b> recommended</span>
+        <span>·</span>
+        <span>from <b>{{ p?.n_candidate_gaps ?? 0 }}</b> eligible build candidates</span>
+        @if (p?.manifest_version) {
+          <span>·</span>
+          <span>manifest v{{ p.manifest_version }}</span>
+        }
+      </div>
+    </section>
+
+    <!-- Prioritized gaps -->
+    @if (p?.prioritized_gaps?.length) {
+      <section class="sc-card">
+        <h3 class="sc-h-title">Build proposals</h3>
+        <div class="cg-gaps">
+          @for (g of p.prioritized_gaps; track g.rank) {
+            <div class="cg-gap" [ngClass]="criticVerdictClass(g.critic_verdict)">
+              <div class="cg-gap-head">
+                <span class="sc-action-rank">#{{ g.rank }}</span>
+                <code class="cg-tag">{{ g.tag }}</code>
+                <span class="cg-axis">{{ g.axis }}</span>
+                @if (g.effort_estimate) {
+                  <span class="cg-effort cg-effort-{{ g.effort_estimate }}">
+                    {{ g.effort_estimate }}
+                  </span>
+                }
+                <span class="sc-verdict-pill" [ngClass]="criticVerdictClass(g.critic_verdict)">
+                  {{ g.critic_verdict ?? 'unreviewed' }}
+                </span>
+              </div>
+
+              <div class="cg-build">
+                <span class="cg-label">Build:</span>
+                <span class="cg-build-text">{{ g.build_proposal }}</span>
+              </div>
+              @if (g.implementation_module) {
+                <div class="cg-module">
+                  <span class="cg-label">Module:</span>
+                  <code>{{ g.implementation_module }}</code>
+                </div>
+              }
+              @if (g.rationale) {
+                <p class="sc-action-rationale">{{ g.rationale }}</p>
+              }
+              @if (g.evidence_cited; as ev) {
+                <div class="cg-evidence">
+                  @if (ev.lift_top_vs_overall != null) {
+                    <span><b>{{ fmtNum(ev.lift_top_vs_overall) }}×</b> lift</span>
+                  }
+                  @if (ev.n_in_top != null) {
+                    <span>·</span>
+                    <span><b>n={{ ev.n_in_top }}</b> in top quintile</span>
+                  }
+                  @if (ev.avg_breakout_when_present != null) {
+                    <span>·</span>
+                    <span><b>{{ fmtNum(ev.avg_breakout_when_present) }}×</b> avg breakout when present</span>
+                  }
+                </div>
+              }
+              @if (g.experiment_to_validate) {
+                <div class="cg-experiment">
+                  <span class="cg-label">Experiment:</span>
+                  <span>{{ g.experiment_to_validate }}</span>
+                </div>
+              }
+              @if (g.critic_reasoning) {
+                <div class="sc-critique-inline">
+                  <span class="sc-critique-label">critic:</span>
+                  <span class="sc-critique-text">{{ g.critic_reasoning }}</span>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Negative signals: do not build -->
+    @if (p?.warnings_against_building?.length) {
+      <section class="sc-card cg-warnings">
+        <h3 class="sc-h-title">Do NOT build <span class="sc-h-sub">— these tags are more common in losers than winners</span></h3>
+        <div class="cg-warn-grid">
+          @for (w of p.warnings_against_building; track w.tag) {
+            <div class="cg-warn">
+              <div class="cg-warn-head">
+                <code class="cg-tag">{{ w.tag }}</code>
+                <span class="cg-axis">{{ w.axis }}</span>
+              </div>
+              <div class="cg-warn-bars">
+                <span class="cg-bar cg-bar-top">
+                  <span class="cg-bar-fill" [style.width]="pctWidth(w.top_rate * 100)"></span>
+                  <span class="cg-bar-pct">top {{ fmtNum(w.top_rate * 100, 0) }}%</span>
+                </span>
+                <span class="cg-bar cg-bar-bottom">
+                  <span class="cg-bar-fill" [style.width]="pctWidth(w.bottom_rate * 100)"></span>
+                  <span class="cg-bar-pct">bot {{ fmtNum(w.bottom_rate * 100, 0) }}%</span>
+                </span>
+              </div>
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Critic-flagged gaps the generator skipped -->
+    @if (p?.missed_gaps_worth_considering?.length) {
+      <section class="sc-card sc-extras">
+        <h3 class="sc-h-title">Critic-flagged gaps the generator skipped</h3>
+        <ul class="sc-bullet-list">
+          @for (m of p.missed_gaps_worth_considering; track m) { <li>{{ m }}</li> }
+        </ul>
+      </section>
+    }
+  </div>
+</ng-template>
+
+
+<ng-template #editReviewTpl let-p="p">
+  <div class="er-pane">
+    <!-- Advisory mode: simpleautosubs hasn't shipped editorial_decisions yet -->
+    @if (p?.advisory_only) {
+      <section class="er-advisory-banner">
+        <div class="er-advisory-title">Awaiting editorial data from SimpleAutoSubs</div>
+        <p class="er-advisory-text">{{ p?.advisory_summary }}</p>
+      </section>
+      @if (p?.checklist?.length) {
+        <section class="sc-card">
+          <h3 class="sc-h-title">Pattern-level checklist</h3>
+          <ul class="er-checklist">
+            @for (c of p.checklist; track c.check) {
+              <li>
+                <span class="er-check-label">{{ c.check }}</span>
+                <span class="er-check-rationale">{{ c.rationale }}</span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    } @else {
+      <!-- Verdict + iteration progress banner -->
+      <section class="er-verdict" [ngClass]="'er-v-' + (p?.verdict ?? 'unknown')">
+        <div class="er-verdict-row">
+          <div class="er-verdict-pill">{{ p?.verdict }}</div>
+          <div class="er-iter-progress">
+            iteration <b>{{ p?.iteration_reviewed }}</b>
+            of <b>{{ p?.max_iterations_known }}</b>
+          </div>
+          @if (p?.current_score != null) {
+            <div class="er-score-pill"
+                 [class.er-score-good]="p.current_score >= 80"
+                 [class.er-score-poor]="p.current_score < 60">
+              score <b>{{ p.current_score }}</b>
+            </div>
+          }
+        </div>
+        @if (p?.verdict === 'ship_current') {
+          <div class="er-recommended">
+            <span class="er-rec-label">Ship iteration:</span>
+            <span class="er-rec-value">v{{ p?.ship_which_iteration }} (current)</span>
+          </div>
+        } @else if (p?.verdict === 'ship_prior') {
+          <div class="er-recommended">
+            <span class="er-rec-label">Ship iteration:</span>
+            <span class="er-rec-value">v{{ p?.ship_which_iteration }} (a prior cut scored higher)</span>
+          </div>
+        } @else if (p?.verdict === 'needs_edits') {
+          <div class="er-recommended">
+            <span class="er-rec-label">Recommended:</span>
+            <span class="er-rec-value">re-cut with directives below; projected gain {{ p?.projected_improvement }} pts</span>
+          </div>
+        }
+        @if (p?.review_summary) {
+          <p class="er-review-summary">{{ p.review_summary }}</p>
+        }
+      </section>
+
+      <!-- Score breakdown + concerns -->
+      <div class="er-grid">
+        @if (p?.score_breakdown; as sb) {
+          <section class="sc-card">
+            <h3 class="sc-h-title">Score breakdown</h3>
+            <div class="er-sb">
+              @if (sb.channel_pattern_alignment != null) {
+                <div class="er-sb-row">
+                  <span class="er-sb-label">channel pattern alignment</span>
+                  <span class="er-sb-bar"><span class="er-sb-fill" [style.width]="pctWidth(sb.channel_pattern_alignment)"></span></span>
+                  <span class="er-sb-num">{{ sb.channel_pattern_alignment }}</span>
+                </div>
+              }
+              @if (sb.capability_use != null) {
+                <div class="er-sb-row">
+                  <span class="er-sb-label">capability use</span>
+                  <span class="er-sb-bar"><span class="er-sb-fill" [style.width]="pctWidth(sb.capability_use)"></span></span>
+                  <span class="er-sb-num">{{ sb.capability_use }}</span>
+                </div>
+              }
+              @if (sb.punch_clarity != null) {
+                <div class="er-sb-row">
+                  <span class="er-sb-label">punch clarity</span>
+                  <span class="er-sb-bar"><span class="er-sb-fill" [style.width]="pctWidth(sb.punch_clarity)"></span></span>
+                  <span class="er-sb-num">{{ sb.punch_clarity }}</span>
+                </div>
+              }
+            </div>
+          </section>
+        }
+
+        @if (p?.concerns?.length) {
+          <section class="sc-card">
+            <h3 class="sc-h-title">Concerns</h3>
+            <ul class="sc-bullet-list">
+              @for (c of p.concerns; track c) { <li>{{ c }}</li> }
+            </ul>
+          </section>
+        }
+      </div>
+
+      <!-- Edit directives (only if needs_edits) -->
+      @if (p?.verdict === 'needs_edits' && p?.edit_directives; as ed) {
+        <section class="sc-card er-directives">
+          <h3 class="sc-h-title">Edit directives <span class="sc-h-sub">— for SimpleAutoSubs to apply</span></h3>
+
+          @if (ed.retrim?.should_retrim) {
+            <div class="er-dir-block">
+              <span class="er-dir-type">retrim</span>
+              <span class="er-dir-text">{{ ed.retrim.reason }}</span>
+              @if (ed.retrim.new_segments_to_keep?.length) {
+                <code class="er-dir-segments">
+                  segments: {{ ed.retrim.new_segments_to_keep | json }}
+                </code>
+              }
+            </div>
+          }
+
+          @if (ed.cinematography_changes?.length) {
+            <div class="er-dir-section">
+              <h4 class="er-dir-section-title">Cinematography</h4>
+              @for (c of ed.cinematography_changes; track $index) {
+                <div class="er-dir-block">
+                  <span class="er-dir-type er-dir-type-{{ c.type }}">{{ c.type }}</span>
+                  <span class="er-dir-time">t={{ fmtNum(c.at_time, 1) }}s</span>
+                  @if (c.from_action) { <code class="er-dir-action">{{ c.from_action }}</code> }
+                  @if (c.from_action && c.to_action) { <span class="er-dir-arrow">→</span> }
+                  @if (c.to_action) { <code class="er-dir-action">{{ c.to_action }}</code> }
+                  @if (c.duration) { <span class="er-dir-duration">{{ fmtNum(c.duration, 1) }}s</span> }
+                  <span class="er-dir-reason">{{ c.reason }}</span>
+                </div>
+              }
+            </div>
+          }
+
+          @if (ed.onomatopoeia_changes?.length) {
+            <div class="er-dir-section">
+              <h4 class="er-dir-section-title">Onomatopoeia</h4>
+              @for (c of ed.onomatopoeia_changes; track $index) {
+                <div class="er-dir-block">
+                  <span class="er-dir-type er-dir-type-{{ c.type }}">{{ c.type }}</span>
+                  <span class="er-dir-time">t={{ fmtNum(c.at_time, 1) }}s</span>
+                  @if (c.word) { <code class="er-dir-action">{{ c.word }}</code> }
+                  @if (c.animation) { <code class="er-dir-action">{{ c.animation }}</code> }
+                  @if (c.intensity != null) { <span class="er-dir-duration">i={{ fmtNum(c.intensity, 2) }}</span> }
+                  <span class="er-dir-reason">{{ c.reason }}</span>
+                </div>
+              }
+            </div>
+          }
+
+          @if (ed.subtitle_changes?.length) {
+            <div class="er-dir-section">
+              <h4 class="er-dir-section-title">Subtitles</h4>
+              @for (c of ed.subtitle_changes; track $index) {
+                <div class="er-dir-block">
+                  <span class="er-dir-type">{{ c.type }}</span>
+                  <span class="er-dir-reason">{{ c.reason }}</span>
+                </div>
+              }
+            </div>
+          }
+
+          @if (p?.directives_dropped_by_critic?.length) {
+            <div class="er-dropped">
+              <span class="sc-critique-label">critic dropped:</span>
+              <ul>
+                @for (d of p.directives_dropped_by_critic; track d.directive_path) {
+                  <li><code>{{ d.directive_path }}</code> — {{ d.reason }}</li>
+                }
+              </ul>
+            </div>
+          }
+        </section>
+      }
+
+      <!-- Iterations seen so far -->
+      @if (p?.iterations_seen?.length) {
+        <section class="sc-card">
+          <h3 class="sc-h-title">Iteration history</h3>
+          <div class="er-iters">
+            @for (it of p.iterations_seen; track it.iteration) {
+              <div class="er-iter" [class.er-iter-best]="it.iteration === p?.ship_which_iteration">
+                <span class="er-iter-num">v{{ it.iteration }}</span>
+                <span class="er-iter-score"
+                      [class.er-score-good]="it.score >= 80"
+                      [class.er-score-poor]="it.score < 60">{{ it.score }}</span>
+                <span class="er-iter-verdict">{{ it.verdict }}</span>
+                <span class="er-iter-summary">{{ it.summary }}</span>
+              </div>
+            }
+          </div>
+        </section>
+      }
+
+      <!-- Critique callouts -->
+      @if (p?.score_critique || p?.verdict_critique) {
+        <section class="sc-card sc-extras">
+          <h3 class="sc-h-title">Critic notes</h3>
+          @if (p?.score_critique) {
+            <div class="sc-critique-inline">
+              <span class="sc-critique-label">on score:</span>
+              <span class="sc-critique-text">{{ p.score_critique }}</span>
+            </div>
+          }
+          @if (p?.verdict_critique) {
+            <div class="sc-critique-inline">
+              <span class="sc-critique-label">on verdict:</span>
+              <span class="sc-critique-text">{{ p.verdict_critique }}</span>
+            </div>
+          }
+        </section>
+      }
     }
   </div>
 </ng-template>

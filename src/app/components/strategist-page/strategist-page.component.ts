@@ -81,7 +81,7 @@ interface RecommendationItem {
 }
 
 type Tab = 'thinker' | 'cuts' | 'experiments' | 'traces';
-type RecCategory = 'postmortems' | 'tailwind_critiques' | 'titles' | 'channel' | 'capabilities';
+type RecCategory = 'postmortems' | 'tailwind_critiques' | 'titles' | 'channel' | 'capabilities' | 'edits';
 
 @Component({
   selector: 'app-strategist-page',
@@ -119,9 +119,10 @@ export class StrategistPageComponent extends PollingComponent {
   readonly recCategories: Array<{ id: RecCategory; label: string }> = [
     { id: 'channel',            label: 'Channel reports' },
     { id: 'titles',             label: 'Title recs' },
+    { id: 'edits',              label: 'Edit reviews' },
+    { id: 'capabilities',       label: 'Capability gaps' },
     { id: 'postmortems',        label: 'Postmortems' },
     { id: 'tailwind_critiques', label: 'Tailwind critiques' },
-    { id: 'capabilities',       label: 'Capability gaps' },
   ];
 
   // ── Cuts ──────────────────────────────────────────────────────────────────

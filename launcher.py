@@ -149,6 +149,20 @@ async def start_service(name: str) -> Dict[str, Any]:
 
     proc_env = os.environ.copy()
     proc_env["PYTHONUNBUFFERED"] = "1"
+    # Per-service env merge: a service entry can declare an "env" dict in
+    # service_defs.py. Values are coerced to str (subprocess requires it).
+    # Anything in defn["env"] wins over the inherited shell env.
+    service_env = defn.get("env") or {}
+    for k, v in service_env.items():
+        if v is None:
+            proc_env.pop(str(k), None)
+        else:
+            proc_env[str(k)] = str(v)
+    if service_env:
+        # Log what we merged so the operator can verify the iteration loop
+        # toggle (and any other per-service env) actually reached the child.
+        merged_summary = ", ".join(f"{k}={v}" for k, v in service_env.items())
+        _append_log(name, f"    env: {merged_summary}")
 
     try:
         p = subprocess.Popen(

@@ -12,6 +12,12 @@ interface ServiceStatus {
   health_check: string;
 }
 
+interface ThinkerStatus {
+  state: 'stopped' | 'running' | 'idle' | 'error';
+  queue_depth: number;
+  current_task: { task_type: string; key: string } | null;
+}
+
 const REQUIRED_API_IDS = ['simple_auto_subs_api', 'shorts_analyzer_api', 'shorts_strategist_api'];
 
 @Component({
@@ -44,6 +50,39 @@ const REQUIRED_API_IDS = ['simple_auto_subs_api', 'shorts_analyzer_api', 'shorts
       </div>
 
       <div class="ribbon-right">
+        @if (strategistOnline()) {
+          <span class="thinker-pill" [attr.data-state]="thinker()?.state ?? 'unknown'">
+            <span class="thinker-dot"></span>
+            <span class="thinker-label">Thinker</span>
+            <span class="thinker-state">{{ thinkerStateLabel() }}</span>
+            @if ((thinker()?.queue_depth ?? 0) > 0) {
+              <span class="thinker-q">{{ thinker()?.queue_depth }}</span>
+            }
+          </span>
+
+          <button class="ribbon-btn ribbon-btn--small"
+                  [class.ribbon-btn--stop]="thinkerRunning() && !thinkerBusy()"
+                  (click)="toggleThinker()"
+                  [disabled]="thinkerBusy()"
+                  title="Start or stop the strategist thinker loop">
+            @if (thinkerBusy()) {
+              <span class="btn-spin"></span>
+            } @else if (thinkerRunning()) {
+              ■
+            } @else {
+              ▶
+            }
+            Thinker
+          </button>
+
+          <button class="ribbon-btn ribbon-btn--small ribbon-btn--ghost"
+                  (click)="clearThinkerQueue()"
+                  [disabled]="thinkerBusy()"
+                  title="Mark all stale tasks as 'skipped' without running them. Forced tasks are unaffected.">
+            ✕ Queue
+          </button>
+        }
+
         <button class="ribbon-btn"
                 [class.ribbon-btn--stop]="apisReady() && !busy()"
                 (click)="toggleApis()"
@@ -70,11 +109,33 @@ export class StatusRibbonComponent extends PollingComponent {
   busy           = signal(false);
   busyLabel      = signal('Starting…');
 
+  // Thinker state — populated when shorts_strategist_api is online.
+  thinker        = signal<ThinkerStatus | null>(null);
+  thinkerBusy    = signal(false);
+
   apisReady = () => {
     const svcs = this.services();
     return REQUIRED_API_IDS.every(
       id => svcs.find(s => s.id === id)?.status === 'online',
     );
+  };
+
+  strategistOnline = () =>
+    this.services().find(s => s.id === 'shorts_strategist_api')?.status === 'online';
+
+  thinkerRunning = () => {
+    const s = this.thinker()?.state;
+    return s === 'running' || s === 'idle';
+  };
+
+  thinkerStateLabel = () => {
+    switch (this.thinker()?.state) {
+      case 'running': return 'running';
+      case 'idle':    return 'idle';
+      case 'error':   return 'error';
+      case 'stopped': return 'stopped';
+      default:        return '—';
+    }
   };
 
   shortLabel(s: ServiceStatus): string {
@@ -92,6 +153,53 @@ export class StatusRibbonComponent extends PollingComponent {
       }
     } catch {
       this.launcherOnline.set(false);
+    }
+
+    // Pull thinker status only when the strategist API is online — saves
+    // a noisy 404/connection-refused on every tick when it isn't.
+    if (this.strategistOnline()) {
+      try {
+        const r = await fetch('/shorts-strategist/thinker/status');
+        if (r.ok) this.thinker.set(await r.json() as ThinkerStatus);
+      } catch {
+        // Leave the prior thinker value; we'll retry next tick.
+      }
+    } else {
+      this.thinker.set(null);
+    }
+  }
+
+  async toggleThinker() {
+    if (this.thinkerBusy() || !this.strategistOnline()) return;
+    const action = this.thinkerRunning() ? 'stop' : 'start';
+    this.thinkerBusy.set(true);
+    try {
+      const r = await fetch(`/shorts-strategist/thinker/${action}`, { method: 'POST' });
+      if (r.ok) this.thinker.set(await r.json() as ThinkerStatus);
+    } finally {
+      this.thinkerBusy.set(false);
+      // Re-poll to catch transient state changes.
+      setTimeout(() => this.poll(), 800);
+    }
+  }
+
+  async clearThinkerQueue() {
+    if (this.thinkerBusy() || !this.strategistOnline()) return;
+    const depth = this.thinker()?.queue_depth ?? 0;
+    const msg = depth > 0
+      ? `Clear ${depth} pending task${depth === 1 ? '' : 's'}? Each will be marked "skipped by operator" with no LLM call. Forced tasks are unaffected.`
+      : 'No queued tasks. Clear anyway? (will be a no-op)';
+    if (!confirm(msg)) return;
+    this.thinkerBusy.set(true);
+    try {
+      const r = await fetch('/shorts-strategist/thinker/clear-stale', { method: 'POST' });
+      if (r.ok) {
+        const data = await r.json();
+        console.log(`Cleared ${data.skipped} stale task(s).`);
+      }
+      await this.poll();
+    } finally {
+      this.thinkerBusy.set(false);
     }
   }
 

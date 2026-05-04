@@ -82,6 +82,13 @@ SERVICE_DEFS: Dict[str, Dict[str, Any]] = {
         "managed":      True,
         "is_gui":       True,
         "color_hint":   "#63e2b7",     # teal
+        # Enable the strategist-driven iteration loop. SimpleAutoSubs's
+        # process_single_video reads this and routes through
+        # IterationOrchestrator (core/iteration_loop.py). Set to "0" or
+        # remove this key to fall back to single-pass behavior.
+        "env": {
+            "SHORTS_STRATEGIST_ITERATION_LOOP": "1",
+        },
     },
     "simple_auto_subs_api": {
         "label":        "SimpleAutoSubs API",
@@ -94,6 +101,9 @@ SERVICE_DEFS: Dict[str, Dict[str, Any]] = {
         "managed":      True,
         "is_gui":       False,
         "color_hint":   "#34d399",     # emerald
+        "env": {
+            "SHORTS_STRATEGIST_ITERATION_LOOP": "1",
+        },
     },
     "youtube_publisher": {
         "label":        "YouTube Shorts Publisher",

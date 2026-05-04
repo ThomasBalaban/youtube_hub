@@ -3,7 +3,7 @@
   top: 0;
   left: 0;
   height: 100vh;
-  width: 64px;
+  width: 80px;
   background: #161616;
   border-right: 1px solid #2a2a2a;
   display: flex;
@@ -32,31 +32,23 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  width: 48px;
   padding: 10px 0;
   border-radius: 10px;
-  border: 1px solid transparent;
   text-decoration: none;
   color: #4b5563;
   transition: all 0.15s;
   cursor: pointer;
 
   &:hover {
-    background: #1e1e1e;
-    border-color: #333;
     color: #9ca3af;
   }
 
   &.active {
-    background: rgba(34, 197, 94, 0.08);
-    border-color: rgba(34, 197, 94, 0.3);
     color: #4ade80;
   }
 
   // Auto-run gets amber active state
   &--autorun.active {
-    background: rgba(251, 191, 36, 0.08);
-    border-color: rgba(251, 191, 36, 0.3);
     color: #fbbf24;
   }
 }
