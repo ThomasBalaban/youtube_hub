@@ -175,6 +175,12 @@
   &[data-state="stopped"], &[data-state="unknown"] {
     .thinker-dot { background: #4b5563; }
   }
+  &[data-state="offline"] {
+    opacity: 0.65;
+    .thinker-label { color: #6b7280; }
+    .thinker-state { color: #6b7280; font-style: italic; }
+    .thinker-dot   { background: #4b5563; }
+  }
 }
 
 .ribbon-btn--small {

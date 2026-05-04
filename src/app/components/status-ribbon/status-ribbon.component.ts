@@ -50,38 +50,37 @@ const REQUIRED_API_IDS = ['simple_auto_subs_api', 'shorts_analyzer_api', 'shorts
       </div>
 
       <div class="ribbon-right">
-        @if (strategistOnline()) {
-          <span class="thinker-pill" [attr.data-state]="thinker()?.state ?? 'unknown'">
-            <span class="thinker-dot"></span>
-            <span class="thinker-label">Thinker</span>
-            <span class="thinker-state">{{ thinkerStateLabel() }}</span>
-            @if ((thinker()?.queue_depth ?? 0) > 0) {
-              <span class="thinker-q">{{ thinker()?.queue_depth }}</span>
-            }
-          </span>
+        <span class="thinker-pill" [attr.data-state]="thinkerPillState()"
+              [title]="strategistOnline() ? '' : 'Shorts Strategist API is offline'">
+          <span class="thinker-dot"></span>
+          <span class="thinker-label">Thinker</span>
+          <span class="thinker-state">{{ thinkerStateLabel() }}</span>
+          @if ((thinker()?.queue_depth ?? 0) > 0) {
+            <span class="thinker-q">{{ thinker()?.queue_depth }}</span>
+          }
+        </span>
 
-          <button class="ribbon-btn ribbon-btn--small"
-                  [class.ribbon-btn--stop]="thinkerRunning() && !thinkerBusy()"
-                  (click)="toggleThinker()"
-                  [disabled]="thinkerBusy()"
-                  title="Start or stop the strategist thinker loop">
-            @if (thinkerBusy()) {
-              <span class="btn-spin"></span>
-            } @else if (thinkerRunning()) {
-              ■
-            } @else {
-              ▶
-            }
-            Thinker
-          </button>
+        <button class="ribbon-btn ribbon-btn--small ribbon-btn--ghost"
+                (click)="clearThinkerQueue()"
+                [disabled]="thinkerBusy() || !strategistOnline()"
+                title="Mark all stale tasks as 'skipped' without running them. Forced tasks are unaffected.">
+          ✕ Queue
+        </button>
 
-          <button class="ribbon-btn ribbon-btn--small ribbon-btn--ghost"
-                  (click)="clearThinkerQueue()"
-                  [disabled]="thinkerBusy()"
-                  title="Mark all stale tasks as 'skipped' without running them. Forced tasks are unaffected.">
-            ✕ Queue
-          </button>
-        }
+        <button class="ribbon-btn ribbon-btn--small"
+                [class.ribbon-btn--stop]="thinkerRunning() && !thinkerBusy()"
+                (click)="toggleThinker()"
+                [disabled]="thinkerBusy() || !strategistOnline()"
+                [title]="strategistOnline() ? 'Start or stop the strategist thinker loop' : 'Start the Shorts Strategist API first'">
+          @if (thinkerBusy()) {
+            <span class="btn-spin"></span>
+          } @else if (thinkerRunning()) {
+            ■
+          } @else {
+            ▶
+          }
+          Thinker
+        </button>
 
         <button class="ribbon-btn"
                 [class.ribbon-btn--stop]="apisReady() && !busy()"
@@ -129,6 +128,7 @@ export class StatusRibbonComponent extends PollingComponent {
   };
 
   thinkerStateLabel = () => {
+    if (!this.strategistOnline()) return 'offline';
     switch (this.thinker()?.state) {
       case 'running': return 'running';
       case 'idle':    return 'idle';
@@ -136,6 +136,11 @@ export class StatusRibbonComponent extends PollingComponent {
       case 'stopped': return 'stopped';
       default:        return '—';
     }
+  };
+
+  thinkerPillState = () => {
+    if (!this.strategistOnline()) return 'offline';
+    return this.thinker()?.state ?? 'unknown';
   };
 
   shortLabel(s: ServiceStatus): string {

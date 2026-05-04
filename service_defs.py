@@ -72,24 +72,6 @@ def conda_python(env_name: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 SERVICE_DEFS: Dict[str, Dict[str, Any]] = {
-    "simple_auto_subs": {
-        "label":        "SimpleAutoSubs (GUI)",
-        "description":  "Auto-transcribes mic & desktop audio, embeds comic-book onomatopoeia, and generates AI titles for gaming clips",
-        "cmd":          [conda_python("simpleautosubs"), "main.py"],
-        "cwd":          os.path.join(PARENT_DIR, "SimpleAutoSubs"),
-        "port":         None,
-        "health_check": "process",
-        "managed":      True,
-        "is_gui":       True,
-        "color_hint":   "#63e2b7",     # teal
-        # Enable the strategist-driven iteration loop. SimpleAutoSubs's
-        # process_single_video reads this and routes through
-        # IterationOrchestrator (core/iteration_loop.py). Set to "0" or
-        # remove this key to fall back to single-pass behavior.
-        "env": {
-            "SHORTS_STRATEGIST_ITERATION_LOOP": "1",
-        },
-    },
     "simple_auto_subs_api": {
         "label":        "SimpleAutoSubs API",
         "description":  "Headless REST API for the Hub to queue videos, change settings, and run subtitle processing without the GUI",
@@ -168,7 +150,6 @@ SERVICE_DEFS: Dict[str, Dict[str, Any]] = {
 
 # How many times to poll the health check before giving up on startup
 BOOT_RETRIES: Dict[str, int] = {
-    "simple_auto_subs":     5,
     "simple_auto_subs_api": 12,   # Heavier imports — give it more time
     "youtube_publisher":    8,
     "shorts_analyzer_api":  12,   # Heavier imports — give it more time

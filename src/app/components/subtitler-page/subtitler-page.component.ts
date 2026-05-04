@@ -43,6 +43,12 @@ interface ServiceStatus {
   pid: number | null;
 }
 
+interface ThinkerStatus {
+  state: 'stopped' | 'running' | 'idle' | 'error';
+  queue_depth: number;
+  current_task: { task_type: string; key: string } | null;
+}
+
 interface LogFile {
   name: string;
   path: string;
@@ -79,6 +85,8 @@ export class SubtitlerPageComponent extends PollingComponent {
   });
   analyzerStatus = signal<AnalyzerStatus | null>(null);
   serviceStatus  = signal<ServiceStatus | null>(null);
+  strategistOnline = signal(false);
+  thinker        = signal<ThinkerStatus | null>(null);
   launcherOnline = signal(false);
   apiOnline      = signal(false);
   logs           = signal<string[]>([]);
@@ -124,6 +132,21 @@ export class SubtitlerPageComponent extends PollingComponent {
   setSyncOffset(v: number)      { this.settings.update(s => ({ ...s, sync_offset: +v })); }
   setOutputDir(v: string)       { this.settings.update(s => ({ ...s, output_dir: v })); }
   toggleTrimming()              { this.settings.update(s => ({ ...s, enable_trimming: !s.enable_trimming })); }
+
+  // ── Thinker meta ───────────────────────────────────────────────────────────
+  thinkerOffline = computed(() => {
+    if (!this.strategistOnline()) return true;
+    const s = this.thinker()?.state;
+    return s !== 'running' && s !== 'idle';
+  });
+
+  thinkerOfflineReason = computed(() => {
+    if (!this.strategistOnline()) return 'The Shorts Strategist API is not running.';
+    const s = this.thinker()?.state;
+    if (s === 'error')   return 'The thinker hit an error and stopped.';
+    if (s === 'stopped') return 'The thinker loop is stopped.';
+    return 'The thinker is not running.';
+  });
 
   // ── Analyzer bridge meta ───────────────────────────────────────────────────
   analyzerMeta = computed(() => {
@@ -173,13 +196,26 @@ export class SubtitlerPageComponent extends PollingComponent {
         const svc = svcs.find(s => s.id === 'simple_auto_subs_api') ?? null;
         this.serviceStatus.set(svc);
         this.apiOnline.set(svc?.status === 'online');
+        const strat = svcs.find(s => s.id === 'shorts_strategist_api');
+        this.strategistOnline.set(strat?.status === 'online');
       } else {
         this.launcherOnline.set(false);
         this.apiOnline.set(false);
+        this.strategistOnline.set(false);
       }
     } catch {
       this.launcherOnline.set(false);
       this.apiOnline.set(false);
+      this.strategistOnline.set(false);
+    }
+
+    if (this.strategistOnline()) {
+      try {
+        const r = await fetch('/shorts-strategist/thinker/status');
+        if (r.ok) this.thinker.set(await r.json() as ThinkerStatus);
+      } catch { /* leave prior value, retry next tick */ }
+    } else {
+      this.thinker.set(null);
     }
 
     // Settings load via launcher — always available, no API needed

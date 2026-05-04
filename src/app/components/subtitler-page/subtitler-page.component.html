@@ -43,6 +43,18 @@
 
     <div class="left-panel">
 
+      @if (thinkerOffline()) {
+        <div class="thinker-alert">
+          <span class="thinker-alert-icon">⚠</span>
+          <div class="thinker-alert-body">
+            <div class="thinker-alert-title">Thinker is offline</div>
+            <div class="thinker-alert-msg">
+              {{ thinkerOfflineReason() }}
+            </div>
+          </div>
+        </div>
+      }
+
       <section class="section">
         <div class="section-header">
           <div>
