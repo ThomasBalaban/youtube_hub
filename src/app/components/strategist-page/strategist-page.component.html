@@ -19,81 +19,110 @@
   </div>
 
   @if (!launcherOnline()) {
-    <div class="banner-warn">⚠ Launcher offline — start it with <code>npm start</code></div>
+  <div class="banner-warn">⚠ Launcher offline — start it with <code>npm start</code></div>
   } @else if (!apiOnline() && !isStarting()) {
-    <div class="banner-info">Shorts Strategist API is offline. Click <strong>▶ Start API</strong> to bring it online.</div>
+  <div class="banner-info">Shorts Strategist API is offline. Use <strong>Start APIs</strong> in the top ribbon.</div>
   }
 
   <div class="page-panels">
-    <!-- ── Left panel ──────────────────────────────────────────────────── -->
-    <div class="left-panel">
 
-      <!-- Service control -->
-      <section class="section controls-section">
-        <div class="ctrl-row">
-          <button class="btn btn-run"
-                  [disabled]="!launcherOnline() || isRunning() || isStarting() || actionPending()"
-                  (click)="serviceAction('start')">
-            ▶ Start API
-          </button>
-          <button class="btn btn-stop"
-                  [disabled]="!launcherOnline() || (!isRunning() && !isStarting()) || actionPending()"
-                  (click)="serviceAction('stop')">
-            ■ Stop
-          </button>
-          <button class="btn btn-run"
-                  [disabled]="!launcherOnline() || actionPending()"
-                  (click)="serviceAction('restart')">
-            ↻ Restart
-          </button>
-        </div>
-      </section>
+    <!-- ── Left panel: thinker monitor + console ──────────────────────── -->
+    <div class="left-panel" [style.width.px]="leftPaneWidth()">
+      @if (!apiOnline()) {
+      <div class="empty-msg">Start the API to see thinker status.</div>
+      } @else {
+      @if (thinker(); as t) {
+      <!-- current task + snapshot -->
+      <div class="thinker-grid">
 
-      <!-- Health -->
-      <section class="section">
-        <h2 class="section-title">Health</h2>
-        @if (health(); as h) {
-          <div class="kv-row"><span class="kv-key">Port</span><span class="kv-val">{{ h.port }}</span></div>
-          <div class="kv-row">
-            <span class="kv-key">Analyzer</span>
-            <span class="kv-val" [class.kv-bad]="!h.analyzer_reachable">
-              {{ h.analyzer_reachable ? 'reachable' : 'unreachable' }}
-            </span>
+        <div class="th-card">
+          <h3 class="th-card-title">Current task</h3>
+          <div class="th-metrics">
+            <span><b>{{ t.queue_depth }}</b> queued</span>
+            <span>ran <b>{{ t.session_tasks_run }}</b></span>
+            <span>skipped <b>{{ t.session_tasks_skipped }}</b></span>
+            <span>tick {{ formatTime(t.last_tick_at) }}</span>
           </div>
-          <div class="kv-row"><span class="kv-key">Data</span><span class="kv-val kv-mono">{{ h.data_dir }}</span></div>
-          <div class="kv-row"><span class="kv-key">Traces</span><span class="kv-val kv-mono">{{ h.traces_dir }}</span></div>
-        } @else {
-          <div class="empty-msg">Waiting for API…</div>
-        }
-      </section>
-
-      <!-- Endpoints -->
-      <section class="section">
-        <h2 class="section-title">Endpoints <span class="section-hint">live = wired up · stub = 501</span></h2>
-        <div class="ep-list">
-          @for (ep of endpointEntries(); track ep.path) {
-            <div class="ep-row">
-              <code class="ep-path">{{ ep.path }}</code>
-              <span class="ep-badge" [ngClass]="endpointBadgeClass(ep.status)">
-                {{ endpointBadgeLabel(ep.status) }}
-              </span>
-            </div>
+          @if (t.current_task; as ct) {
+          <div class="th-current">
+            <code class="th-task-type">{{ ct.task_type }}</code>
+            <span class="th-task-key">{{ ct.key }}</span>
+          </div>
+          <div class="th-task-desc">{{ ct.description }}</div>
+          } @else {
+          <div class="empty-msg">{{ t.state === 'idle' ? 'Caught up — waiting for new inputs.' : 'No task running.' }}
+          </div>
           }
         </div>
-      </section>
 
-      <!-- Refresh -->
-      <section class="section controls-section">
-        <div class="ctrl-row">
-          <button class="btn btn-run"
-                  [disabled]="!apiOnline()"
-                  (click)="loadCuts(); loadExperiments(); loadTraces()">
-            ↻ Refresh data
-          </button>
+        <div class="th-card">
+          <h3 class="th-card-title">Inputs</h3>
+          @if (t.last_snapshot; as snap) {
+          <div class="kv-row"><span class="kv-key">Channel</span><span class="kv-val">{{ snap.channel_handle }}</span>
+          </div>
+          <div class="kv-row"><span class="kv-key">Shorts</span><span class="kv-val">{{ snap.per_short_count }}</span>
+          </div>
+          <div class="kv-row"><span class="kv-key">Tailwind</span><span class="kv-val">{{ snap.tailwind_count }}</span>
+          </div>
+          <div class="kv-row"><span class="kv-key">Pre-publish</span><span class="kv-val">{{ snap.pre_publish_count
+              }}</span></div>
+          <div class="kv-row">
+            <span class="kv-key">Synthesis</span>
+            <span class="kv-val" [class.kv-bad]="!snap.synthesis_present">
+              {{ snap.synthesis_present ? 'present' : 'missing' }}
+            </span>
+          </div>
+          @if (snap.missing.length > 0) {
+          <div class="th-missing">
+            Missing inputs:
+            <ul>
+              @for (m of snap.missing; track m) { <li><code>{{ m }}</code></li> }
+            </ul>
+          </div>
+          }
+          } @else {
+          <div class="empty-msg">Waiting for first tick…</div>
+          }
         </div>
-      </section>
+      </div>
 
-      <!-- Console / logs -->
+      <!-- error log -->
+      @if (t.errors.length > 0) {
+      <div class="th-errors">
+        <h3 class="th-card-title">Recent errors</h3>
+        @for (e of t.errors.slice(-5); track e.at) {
+        <div class="th-err">
+          <span class="th-err-time">{{ formatTime(e.at) }}</span>
+          <span class="th-err-msg">{{ e.msg }}</span>
+        </div>
+        }
+      </div>
+      }
+
+      <!-- queue preview -->
+      @if (thinkerQueue().length > 0) {
+      <div class="th-card">
+        <h3 class="th-card-title">Pending queue ({{ thinkerQueue().length }})</h3>
+        <div class="th-queue">
+          @for (q of thinkerQueue().slice(0, 8); track q.task_type + q.key) {
+          <div class="th-q-row">
+            <code class="th-task-type">{{ q.task_type }}</code>
+            <span class="th-task-key">{{ q.key }}</span>
+            <span class="th-task-desc">{{ q.description }}</span>
+          </div>
+          }
+          @if (thinkerQueue().length > 8) {
+          <div class="th-q-more">+ {{ thinkerQueue().length - 8 }} more</div>
+          }
+        </div>
+      </div>
+      }
+      } @else {
+      <div class="empty-msg">Loading thinker status…</div>
+      }
+      }
+
+      <!-- Console (always visible) -->
       <section class="log-section">
         <div class="log-header">
           <div class="log-header-left">
@@ -107,31 +136,30 @@
         </div>
         <div class="log-body">
           @if (logs().length === 0) {
-            <div class="log-empty">
-              @if (apiOnline()) { (no output yet) }
-              @else { (start the API to see logs) }
-            </div>
+          <div class="log-empty">
+            @if (apiOnline()) { (no output yet) }
+            @else { (start the API to see logs) }
+          </div>
           } @else {
-            @for (line of logs(); track $index) {
-              <div class="log-line"
-                   [class.err]="isErr(line)"
-                   [class.warn]="isWarn(line)"
-                   [class.ok]="isOk(line)">{{ line }}</div>
-            }
+          @for (line of logs(); track $index) {
+          <div class="log-line" [class.err]="isErr(line)" [class.warn]="isWarn(line)" [class.ok]="isOk(line)">{{ line }}
+          </div>
+          }
           }
         </div>
       </section>
     </div>
 
-    <!-- ── Right panel ─────────────────────────────────────────────────── -->
+    <div class="pane-resizer"
+         [class.dragging]="resizing()"
+         title="Drag to resize"
+         (mousedown)="startResize($event)"></div>
+
+    <!-- ── Right panel: artifact browsers ─────────────────────────────── -->
     <div class="right-panel">
-      <!-- Tabs -->
       <div class="tab-bar">
-        <button class="tab" [class.tab-active]="activeTab() === 'thinker'" (click)="setTab('thinker')">
-          Thinker
-          @if (thinker(); as t) {
-            <span class="tab-count">{{ t.queue_depth }}</span>
-          }
+        <button class="tab" [class.tab-active]="activeTab() === 'recommendations'" (click)="setTab('recommendations')">
+          Recommendations <span class="tab-count">{{ recItems().length }}</span>
         </button>
         <button class="tab" [class.tab-active]="activeTab() === 'cuts'" (click)="setTab('cuts')">
           Cuts <span class="tab-count">{{ cuts().length }}</span>
@@ -145,319 +173,205 @@
       </div>
 
       <div class="tab-body">
-        <!-- ── Thinker tab ──────────────────────────────────────────── -->
-        @if (activeTab() === 'thinker') {
-          @if (!apiOnline()) {
-            <div class="empty-msg">Start the API to use the thinker.</div>
-          } @else {
-            @if (thinker(); as t) {
-            <div class="thinker-pane">
-              <!-- status row -->
-              <div class="thinker-status" [style.--tc]="thinkerStateMeta().color">
-                <div class="th-state">
-                  <span class="th-dot"></span>
-                  <span class="th-label">{{ thinkerStateMeta().label }}</span>
-                </div>
-                <div class="th-metrics">
-                  <span><b>{{ t.queue_depth }}</b> queued</span>
-                  <span>·</span>
-                  <span>ran <b>{{ t.session_tasks_run }}</b></span>
-                  <span>·</span>
-                  <span>skipped <b>{{ t.session_tasks_skipped }}</b></span>
-                  <span>·</span>
-                  <span>tick {{ formatTime(t.last_tick_at) }}</span>
-                </div>
-                <div class="th-controls">
-                  <button class="btn btn-run"
-                          [disabled]="thinkerActionPending() || t.state === 'running' || t.state === 'idle'"
-                          (click)="thinkerAction('start')">▶ Start</button>
-                  <button class="btn btn-stop"
-                          [disabled]="thinkerActionPending() || t.state === 'stopped'"
-                          (click)="thinkerAction('stop')">■ Stop</button>
-                </div>
-              </div>
-
-              <!-- current task + snapshot -->
-              <div class="thinker-grid">
-                <div class="th-card">
-                  <h3 class="th-card-title">Current task</h3>
-                  @if (t.current_task; as ct) {
-                    <div class="th-current">
-                      <code class="th-task-type">{{ ct.task_type }}</code>
-                      <span class="th-task-key">{{ ct.key }}</span>
-                    </div>
-                    <div class="th-task-desc">{{ ct.description }}</div>
-                  } @else {
-                    <div class="empty-msg">{{ t.state === 'idle' ? 'Caught up — waiting for new inputs.' : 'No task running.' }}</div>
-                  }
-                </div>
-
-                <div class="th-card">
-                  <h3 class="th-card-title">Inputs</h3>
-                  @if (t.last_snapshot; as snap) {
-                    <div class="kv-row"><span class="kv-key">Channel</span><span class="kv-val">{{ snap.channel_handle }}</span></div>
-                    <div class="kv-row"><span class="kv-key">Shorts</span><span class="kv-val">{{ snap.per_short_count }}</span></div>
-                    <div class="kv-row"><span class="kv-key">Tailwind</span><span class="kv-val">{{ snap.tailwind_count }}</span></div>
-                    <div class="kv-row"><span class="kv-key">Pre-publish</span><span class="kv-val">{{ snap.pre_publish_count }}</span></div>
-                    <div class="kv-row">
-                      <span class="kv-key">Synthesis</span>
-                      <span class="kv-val" [class.kv-bad]="!snap.synthesis_present">
-                        {{ snap.synthesis_present ? 'present' : 'missing' }}
-                      </span>
-                    </div>
-                    @if (snap.missing.length > 0) {
-                      <div class="th-missing">
-                        Missing inputs:
-                        <ul>
-                          @for (m of snap.missing; track m) { <li><code>{{ m }}</code></li> }
-                        </ul>
-                      </div>
-                    }
-                  } @else {
-                    <div class="empty-msg">Waiting for first tick…</div>
-                  }
-                </div>
-              </div>
-
-              <!-- error log -->
-              @if (t.errors.length > 0) {
-                <div class="th-errors">
-                  <h3 class="th-card-title">Recent errors</h3>
-                  @for (e of t.errors.slice(-5); track e.at) {
-                    <div class="th-err">
-                      <span class="th-err-time">{{ formatTime(e.at) }}</span>
-                      <span class="th-err-msg">{{ e.msg }}</span>
-                    </div>
-                  }
-                </div>
-              }
-
-              <!-- queue preview -->
-              @if (thinkerQueue().length > 0) {
-                <div class="th-card">
-                  <h3 class="th-card-title">Pending queue ({{ thinkerQueue().length }})</h3>
-                  <div class="th-queue">
-                    @for (q of thinkerQueue().slice(0, 8); track q.task_type + q.key) {
-                      <div class="th-q-row">
-                        <code class="th-task-type">{{ q.task_type }}</code>
-                        <span class="th-task-key">{{ q.key }}</span>
-                        <span class="th-task-desc">{{ q.description }}</span>
-                      </div>
-                    }
-                    @if (thinkerQueue().length > 8) {
-                      <div class="th-q-more">+ {{ thinkerQueue().length - 8 }} more</div>
-                    }
-                  </div>
-                </div>
-              }
-
-              <!-- recommendations browser -->
-              <div class="th-card th-recs">
-                <div class="th-recs-head">
-                  <h3 class="th-card-title" style="margin:0">Recommendations</h3>
-                  <div class="th-recs-cats">
-                    @for (c of recCategories; track c.id) {
-                      <button class="th-cat"
-                              [class.th-cat-active]="recCategory() === c.id"
-                              (click)="setRecCategory(c.id)">
-                        {{ c.label }}
-                      </button>
-                    }
-                  </div>
-                </div>
-
-                @if (selectedRec(); as sel) {
-                  <div class="rec-viewer">
-                    <div class="rec-viewer-head">
-                      <button class="viewer-back-btn" (click)="closeRecommendation()">← Back</button>
-                      <code class="trace-viewer-id">{{ sel.category }}/{{ sel.key }}</code>
-                      <div class="rec-view-toggle">
-                        <button class="rv-toggle"
-                                [class.rv-toggle-active]="recViewMode() === 'structured'"
-                                (click)="recViewMode.set('structured')">Structured</button>
-                        <button class="rv-toggle"
-                                [class.rv-toggle-active]="recViewMode() === 'raw'"
-                                (click)="recViewMode.set('raw')">Raw JSON</button>
-                      </div>
-                    </div>
-
-                    @if (recViewMode() === 'raw') {
-                      <pre class="trace-json">{{ prettyRec() }}</pre>
-                    } @else {
-                      @if (recPayload()?.partial_critique) {
-                        <div class="partial-banner">
-                          ⚠ Partial critique — the critic returned fewer reviews than the generator proposed. Some items may show as "unreviewed".
-                        </div>
-                      }
-
-                      @switch (recTaskType()) {
-                        @case ('channel_scorecard') {
-                          <ng-container *ngTemplateOutlet="scorecardTpl; context: { p: recPayload() }"></ng-container>
-                        }
-                        @case ('pre_publish_title') {
-                          <ng-container *ngTemplateOutlet="titleRecTpl; context: { p: recPayload() }"></ng-container>
-                        }
-                        @case ('title_pattern_retro') {
-                          <ng-container *ngTemplateOutlet="titlePatternsTpl; context: { p: recPayload() }"></ng-container>
-                        }
-                        @case ('capability_gaps') {
-                          <ng-container *ngTemplateOutlet="capabilityGapsTpl; context: { p: recPayload() }"></ng-container>
-                        }
-                        @case ('pre_publish_edit_review') {
-                          <ng-container *ngTemplateOutlet="editReviewTpl; context: { p: recPayload() }"></ng-container>
-                        }
-                        @default {
-                          <pre class="trace-json">{{ prettyRec() }}</pre>
-                        }
-                      }
-                    }
-                  </div>
-                } @else if (recLoading()) {
-                  <div class="empty-msg">Loading…</div>
-                } @else if (recItems().length === 0) {
-                  <div class="empty-msg">
-                    No artifacts in this category yet.
-                    <p class="empty-hint">The thinker writes here as tasks complete.</p>
-                  </div>
-                } @else {
-                  <ul class="trace-list">
-                    @for (r of recItems(); track r.key) {
-                      <li class="trace-row">
-                        <span class="rec-row-main" (click)="openRecommendation(r)">
-                          <code class="trace-id">{{ r.key }}</code>
-                          @if (r.task_type) {
-                            <span class="rec-task-type">{{ r.task_type }}</span>
-                          }
-                        </span>
-                        <span class="trace-modified">{{ formatDate(r.modified) }}</span>
-                        <button class="rec-force-btn"
-                                [disabled]="isTaskPending(r.task_type, r.key)"
-                                [title]="isTaskPending(r.task_type, r.key) ? 'Already queued — wait for the current run to finish' : 'Re-run this task'"
-                                (click)="forceTask(r.task_type ?? '', r.key); $event.stopPropagation()">↻</button>
-                      </li>
-                    }
-                  </ul>
-                }
-              </div>
-            </div>
-            } @else {
-              <div class="empty-msg">Loading thinker status…</div>
-            }
+        <!-- ── Recommendations tab ──────────────────────────────────── -->
+        @if (activeTab() === 'recommendations') {
+        @if (!apiOnline()) {
+        <div class="empty-msg">Start the API to browse recommendations.</div>
+        } @else {
+        <div class="recs-cats">
+          @for (c of recCategories; track c.id) {
+          <button class="th-cat" [class.th-cat-active]="recCategory() === c.id" (click)="setRecCategory(c.id)">
+            {{ c.label }}
+          </button>
           }
+        </div>
+
+        @if (selectedRec(); as sel) {
+        <div class="rec-viewer">
+          <div class="rec-viewer-head">
+            <button class="viewer-back-btn" (click)="closeRecommendation()">← Back</button>
+            <code class="trace-viewer-id">{{ sel.category }}/{{ sel.key }}</code>
+            <div class="rec-view-toggle">
+              <button class="rv-toggle" [class.rv-toggle-active]="recViewMode() === 'structured'"
+                (click)="recViewMode.set('structured')">Structured</button>
+              <button class="rv-toggle" [class.rv-toggle-active]="recViewMode() === 'raw'"
+                (click)="recViewMode.set('raw')">Raw JSON</button>
+            </div>
+          </div>
+
+          @if (recViewMode() === 'raw') {
+          <pre class="trace-json">{{ prettyRec() }}</pre>
+          } @else {
+          @if (recPayload()?.partial_critique) {
+          <div class="partial-banner">
+            ⚠ Partial critique — the critic returned fewer reviews than the generator proposed. Some items may show as
+            "unreviewed".
+          </div>
+          }
+
+          @switch (recTaskType()) {
+          @case ('channel_scorecard') {
+          <ng-container *ngTemplateOutlet="scorecardTpl; context: { p: recPayload() }"></ng-container>
+          }
+          @case ('pre_publish_title') {
+          <ng-container *ngTemplateOutlet="titleRecTpl; context: { p: recPayload() }"></ng-container>
+          }
+          @case ('title_pattern_retro') {
+          <ng-container *ngTemplateOutlet="titlePatternsTpl; context: { p: recPayload() }"></ng-container>
+          }
+          @case ('capability_gaps') {
+          <ng-container *ngTemplateOutlet="capabilityGapsTpl; context: { p: recPayload() }"></ng-container>
+          }
+          @case ('pre_publish_edit_review') {
+          <ng-container *ngTemplateOutlet="editReviewTpl; context: { p: recPayload() }"></ng-container>
+          }
+          @default {
+          <pre class="trace-json">{{ prettyRec() }}</pre>
+          }
+          }
+          }
+        </div>
+        } @else if (recLoading()) {
+        <div class="empty-msg">Loading…</div>
+        } @else if (recItems().length === 0) {
+        <div class="empty-msg">
+          No artifacts in this category yet.
+          <p class="empty-hint">The thinker writes here as tasks complete.</p>
+        </div>
+        } @else {
+        <ul class="trace-list">
+          @for (r of recItems(); track r.key) {
+          <li class="trace-row">
+            <span class="rec-row-main" (click)="openRecommendation(r)">
+              <code class="trace-id">{{ r.key }}</code>
+              @if (r.task_type) {
+              <span class="rec-task-type">{{ r.task_type }}</span>
+              }
+            </span>
+            <span class="trace-modified">{{ formatDate(r.modified) }}</span>
+            <button class="rec-force-btn" [disabled]="isTaskPending(r.task_type, r.key)"
+              [title]="isTaskPending(r.task_type, r.key) ? 'Already queued — wait for the current run to finish' : 'Re-run this task'"
+              (click)="forceTask(r.task_type ?? '', r.key); $event.stopPropagation()">↻</button>
+          </li>
+          }
+        </ul>
+        }
+        }
         }
 
         <!-- ── Cuts tab ─────────────────────────────────────────────── -->
         @if (activeTab() === 'cuts') {
-          @if (cutsLoading()) {
-            <div class="empty-msg">Loading cuts…</div>
-          } @else if (cutsError()) {
-            <div class="error-msg">{{ cutsError() }}</div>
-          } @else if (cuts().length === 0) {
-            <div class="empty-msg">
-              No cuts recorded yet.
-              <p class="empty-hint">
-                Cuts appear here once SimpleAutoSubs starts posting to
-                <code>/strategy/ingest</code> with a <code>cut_id</code>. Per the
-                gameplan, <code>cut_id</code> plumbing through the subtitler and
-                publisher is the prerequisite for this table to be non-empty.
-              </p>
-            </div>
-          } @else {
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>cut_id</th>
-                  <th>video_id</th>
-                  <th>title</th>
-                  <th>breakout</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (c of cuts(); track c.cut_id) {
-                  <tr>
-                    <td class="td-mono">{{ c.cut_id }}</td>
-                    <td class="td-mono">{{ c.video_id ?? '—' }}</td>
-                    <td>{{ c.title ?? '—' }}</td>
-                    <td>{{ formatScore(c.breakout_score) }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          }
+        @if (cutsLoading()) {
+        <div class="empty-msg">Loading cuts…</div>
+        } @else if (cutsError()) {
+        <div class="error-msg">{{ cutsError() }}</div>
+        } @else if (cuts().length === 0) {
+        <div class="empty-msg">
+          No cuts recorded yet.
+          <p class="empty-hint">
+            Cuts appear here once SimpleAutoSubs starts posting to
+            <code>/strategy/ingest</code> with a <code>cut_id</code>. Per the
+            gameplan, <code>cut_id</code> plumbing through the subtitler and
+            publisher is the prerequisite for this table to be non-empty.
+          </p>
+        </div>
+        } @else {
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>cut_id</th>
+              <th>video_id</th>
+              <th>title</th>
+              <th>breakout</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of cuts(); track c.cut_id) {
+            <tr>
+              <td class="td-mono">{{ c.cut_id }}</td>
+              <td class="td-mono">{{ c.video_id ?? '—' }}</td>
+              <td>{{ c.title ?? '—' }}</td>
+              <td>{{ formatScore(c.breakout_score) }}</td>
+            </tr>
+            }
+          </tbody>
+        </table>
+        }
         }
 
         <!-- ── Experiments tab ──────────────────────────────────────── -->
         @if (activeTab() === 'experiments') {
-          @if (experimentsLoading()) {
-            <div class="empty-msg">Loading experiments…</div>
-          } @else if (experiments().length === 0) {
-            <div class="empty-msg">
-              No experiments designed yet.
-              <p class="empty-hint">
-                <code>/experiment/design</code> is a stub today. Once implemented,
-                designed experiments will appear here with hypothesis, arms, and
-                conclusion.
-              </p>
+        @if (experimentsLoading()) {
+        <div class="empty-msg">Loading experiments…</div>
+        } @else if (experiments().length === 0) {
+        <div class="empty-msg">
+          No experiments designed yet.
+          <p class="empty-hint">
+            <code>/experiment/design</code> is a stub today. Once implemented,
+            designed experiments will appear here with hypothesis, arms, and
+            conclusion.
+          </p>
+        </div>
+        } @else {
+        <div class="exp-list">
+          @for (e of experiments(); track e.experiment_id) {
+          <div class="exp-card">
+            <div class="exp-head">
+              <code class="exp-id">{{ e.experiment_id }}</code>
+              <span class="exp-status" [attr.data-status]="e.status">{{ e.status }}</span>
             </div>
-          } @else {
-            <div class="exp-list">
-              @for (e of experiments(); track e.experiment_id) {
-                <div class="exp-card">
-                  <div class="exp-head">
-                    <code class="exp-id">{{ e.experiment_id }}</code>
-                    <span class="exp-status" [attr.data-status]="e.status">{{ e.status }}</span>
-                  </div>
-                  <div class="exp-hypothesis">{{ e.hypothesis }}</div>
-                  <div class="exp-meta">
-                    <span>{{ e.channel_handle }}</span>
-                    <span>·</span>
-                    <span>metric: {{ e.success_metric }}</span>
-                    <span>·</span>
-                    <span>{{ e.arms.length }} arm{{ e.arms.length === 1 ? '' : 's' }}</span>
-                  </div>
-                  @if (e.conclusion) {
-                    <div class="exp-conclusion">{{ e.conclusion }}</div>
-                  }
-                </div>
-              }
+            <div class="exp-hypothesis">{{ e.hypothesis }}</div>
+            <div class="exp-meta">
+              <span>{{ e.channel_handle }}</span>
+              <span>·</span>
+              <span>metric: {{ e.success_metric }}</span>
+              <span>·</span>
+              <span>{{ e.arms.length }} arm{{ e.arms.length === 1 ? '' : 's' }}</span>
             </div>
+            @if (e.conclusion) {
+            <div class="exp-conclusion">{{ e.conclusion }}</div>
+            }
+          </div>
           }
+        </div>
+        }
         }
 
         <!-- ── Traces tab ───────────────────────────────────────────── -->
         @if (activeTab() === 'traces') {
-          @if (selectedTraceId()) {
-            <div class="trace-viewer">
-              <div class="trace-viewer-head">
-                <button class="viewer-back-btn" (click)="closeTrace()">← Back</button>
-                <code class="trace-viewer-id">{{ selectedTraceId() }}</code>
-              </div>
-              @if (traceLoading()) {
-                <div class="empty-msg">Loading trace…</div>
-              } @else {
-                <pre class="trace-json">{{ prettyTrace() }}</pre>
-              }
-            </div>
-          } @else if (traces().length === 0) {
-            <div class="empty-msg">
-              No traces yet.
-              <p class="empty-hint">
-                Every <code>/think/*</code> call writes a trace to
-                <code>traces/&#123;trace_id&#125;.json</code>. Until those endpoints
-                are implemented, this list stays empty.
-              </p>
-            </div>
+        @if (selectedTraceId()) {
+        <div class="trace-viewer">
+          <div class="trace-viewer-head">
+            <button class="viewer-back-btn" (click)="closeTrace()">← Back</button>
+            <code class="trace-viewer-id">{{ selectedTraceId() }}</code>
+          </div>
+          @if (traceLoading()) {
+          <div class="empty-msg">Loading trace…</div>
           } @else {
-            <ul class="trace-list">
-              @for (t of traces(); track t.trace_id) {
-                <li class="trace-row" (click)="openTrace(t.trace_id)">
-                  <code class="trace-id">{{ t.trace_id }}</code>
-                  <span class="trace-modified">{{ formatDate(t.modified) }}</span>
-                </li>
-              }
-            </ul>
+          <pre class="trace-json">{{ prettyTrace() }}</pre>
           }
+        </div>
+        } @else if (traces().length === 0) {
+        <div class="empty-msg">
+          No traces yet.
+          <p class="empty-hint">
+            Every <code>/think/*</code> call writes a trace to
+            <code>traces/&#123;trace_id&#125;.json</code>. Until those endpoints
+            are implemented, this list stays empty.
+          </p>
+        </div>
+        } @else {
+        <ul class="trace-list">
+          @for (t of traces(); track t.trace_id) {
+          <li class="trace-row" (click)="openTrace(t.trace_id)">
+            <code class="trace-id">{{ t.trace_id }}</code>
+            <span class="trace-modified">{{ formatDate(t.modified) }}</span>
+          </li>
+          }
+        </ul>
         }
+        }
+
       </div>
     </div>
   </div>
@@ -472,207 +386,209 @@
       <h2 class="sc-h-title">Headline</h2>
       <p class="sc-headline-text">{{ p?.headline ?? '—' }}</p>
       @if (p?.headline_critique) {
-        <div class="sc-critique">
-          <span class="sc-critique-label">critic:</span>
-          <span class="sc-critique-text">{{ p.headline_critique }}</span>
-        </div>
+      <div class="sc-critique">
+        <span class="sc-critique-label">critic:</span>
+        <span class="sc-critique-text">{{ p.headline_critique }}</span>
+      </div>
       }
     </section>
 
     <!-- Data quality -->
     @if (p?.data_quality; as dq) {
-      <section class="sc-card">
-        <h3 class="sc-h-title">Data quality</h3>
-        <div class="sc-dq-grid">
-          <div><span class="sc-k">Shorts</span><span class="sc-v">{{ dq.n_shorts }}</span></div>
-          <div><span class="sc-k">Median breakout</span><span class="sc-v">{{ fmtNum(dq.median_breakout) }}</span></div>
-          <div><span class="sc-k">Median views</span><span class="sc-v">{{ dq.median_views }}</span></div>
-          <div><span class="sc-k">View range</span><span class="sc-v">{{ dq.view_range }}</span></div>
-        </div>
-        @if (dq.recent_window; as rw) {
-          <div class="sc-recent">
-            <span class="sc-recent-label">Recent {{ rw.n }}</span>
-            <span>{{ rw.date_span }}</span>
-            <span>·</span>
-            <span>median breakout {{ fmtNum(rw.median_breakout) }}</span>
-            <span>·</span>
-            <span>{{ rw.n_above_2x }} above 2×</span>
-          </div>
-        }
-        @if (dq.warnings?.length) {
-          <ul class="sc-warnings">
-            @for (w of dq.warnings; track w) { <li>⚠ {{ w }}</li> }
-          </ul>
-        }
-      </section>
+    <section class="sc-card">
+      <h3 class="sc-h-title">Data quality</h3>
+      <div class="sc-dq-grid">
+        <div><span class="sc-k">Shorts</span><span class="sc-v">{{ dq.n_shorts }}</span></div>
+        <div><span class="sc-k">Median breakout</span><span class="sc-v">{{ fmtNum(dq.median_breakout) }}</span></div>
+        <div><span class="sc-k">Median views</span><span class="sc-v">{{ dq.median_views }}</span></div>
+        <div><span class="sc-k">View range</span><span class="sc-v">{{ dq.view_range }}</span></div>
+      </div>
+      @if (dq.recent_window; as rw) {
+      <div class="sc-recent">
+        <span class="sc-recent-label">Recent {{ rw.n }}</span>
+        <span>{{ rw.date_span }}</span>
+        <span>·</span>
+        <span>median breakout {{ fmtNum(rw.median_breakout) }}</span>
+        <span>·</span>
+        <span>{{ rw.n_above_2x }} above 2×</span>
+      </div>
+      }
+      @if (dq.warnings?.length) {
+      <ul class="sc-warnings">
+        @for (w of dq.warnings; track w) { <li>⚠ {{ w }}</li> }
+      </ul>
+      }
+    </section>
     }
 
     <!-- Prioritized actions -->
     @if (p?.prioritized_actions?.length) {
-      <section class="sc-card">
-        <h3 class="sc-h-title">Prioritized actions</h3>
-        <div class="sc-actions">
-          @for (a of p.prioritized_actions; track a.leverage_rank) {
-            <div class="sc-action" [ngClass]="criticVerdictClass(a.critic_verdict)">
-              <div class="sc-action-head">
-                <span class="sc-action-rank">#{{ a.leverage_rank }}</span>
-                <span class="sc-action-title">{{ a.action }}</span>
-                <span class="sc-verdict-pill" [ngClass]="criticVerdictClass(a.critic_verdict)">
-                  {{ a.critic_verdict ?? 'unreviewed' }}
-                </span>
-              </div>
-              @if (a.rationale) {
-                <p class="sc-action-rationale">{{ a.rationale }}</p>
-              }
-              @if (a.expected_impact) {
-                <p class="sc-action-impact"><b>Impact:</b> {{ a.expected_impact }}</p>
-              }
-              @if (a.evidence?.length) {
-                <ul class="sc-evidence">
-                  @for (e of a.evidence; track e) { <li>{{ e }}</li> }
-                </ul>
-              }
-              @if (a.critic_reasoning) {
-                <div class="sc-critique-inline">
-                  <span class="sc-critique-label">critic:</span>
-                  <span class="sc-critique-text">{{ a.critic_reasoning }}</span>
-                </div>
-              }
-            </div>
+    <section class="sc-card">
+      <h3 class="sc-h-title">Prioritized actions</h3>
+      <div class="sc-actions">
+        @for (a of p.prioritized_actions; track a.leverage_rank) {
+        <div class="sc-action" [ngClass]="criticVerdictClass(a.critic_verdict)">
+          <div class="sc-action-head">
+            <span class="sc-action-rank">#{{ a.leverage_rank }}</span>
+            <span class="sc-action-title">{{ a.action }}</span>
+            <span class="sc-verdict-pill" [ngClass]="criticVerdictClass(a.critic_verdict)">
+              {{ a.critic_verdict ?? 'unreviewed' }}
+            </span>
+          </div>
+          @if (a.rationale) {
+          <p class="sc-action-rationale">{{ a.rationale }}</p>
+          }
+          @if (a.expected_impact) {
+          <p class="sc-action-impact"><b>Impact:</b> {{ a.expected_impact }}</p>
+          }
+          @if (a.evidence?.length) {
+          <ul class="sc-evidence">
+            @for (e of a.evidence; track e) { <li>{{ e }}</li> }
+          </ul>
+          }
+          @if (a.critic_reasoning) {
+          <div class="sc-critique-inline">
+            <span class="sc-critique-label">critic:</span>
+            <span class="sc-critique-text">{{ a.critic_reasoning }}</span>
+          </div>
           }
         </div>
-      </section>
+        }
+      </div>
+    </section>
     }
 
     <!-- Tag drift -->
     @if (p?.tag_drift?.table?.length) {
-      <section class="sc-card">
-        <h3 class="sc-h-title">Tag drift</h3>
-        @if (p.tag_drift.framing) {
-          <p class="sc-framing">{{ p.tag_drift.framing }}</p>
-        }
-        <div class="drift-table">
-          <div class="drift-head">
-            <div>tag</div>
-            <div>top %</div>
-            <div>bottom %</div>
-            <div>recent %</div>
-            <div>verdict</div>
-          </div>
-          @for (r of p.tag_drift.table; track r.tag + r.axis) {
-            <div class="drift-row" [ngClass]="driftVerdictClass(r.verdict)">
-              <div class="drift-tag">
-                <span class="drift-axis">{{ r.axis }}</span>
-                <code>{{ r.tag }}</code>
-              </div>
-              <div class="drift-bar drift-top">
-                <span class="drift-fill" [style.width]="pctWidth(r.top_pct)"></span>
-                <span class="drift-pct">{{ r.top_pct }}%</span>
-              </div>
-              <div class="drift-bar drift-bottom">
-                <span class="drift-fill" [style.width]="pctWidth(r.bottom_pct)"></span>
-                <span class="drift-pct">{{ r.bottom_pct }}%</span>
-              </div>
-              <div class="drift-bar drift-recent">
-                <span class="drift-fill" [style.width]="pctWidth(r.recent_30_pct)"></span>
-                <span class="drift-pct">{{ r.recent_30_pct }}%</span>
-              </div>
-              <div class="drift-verdict">{{ driftVerdictLabel(r.verdict) }}</div>
-            </div>
-          }
+    <section class="sc-card">
+      <h3 class="sc-h-title">Tag drift</h3>
+      @if (p.tag_drift.framing) {
+      <p class="sc-framing">{{ p.tag_drift.framing }}</p>
+      }
+      <div class="drift-table">
+        <div class="drift-head">
+          <div>tag</div>
+          <div>top %</div>
+          <div>bottom %</div>
+          <div>recent %</div>
+          <div>verdict</div>
         </div>
-      </section>
+        @for (r of p.tag_drift.table; track r.tag + r.axis) {
+        <div class="drift-row" [ngClass]="driftVerdictClass(r.verdict)">
+          <div class="drift-tag">
+            <span class="drift-axis">{{ r.axis }}</span>
+            <code>{{ r.tag }}</code>
+          </div>
+          <div class="drift-bar drift-top">
+            <span class="drift-fill" [style.width]="pctWidth(r.top_pct)"></span>
+            <span class="drift-pct">{{ r.top_pct }}%</span>
+          </div>
+          <div class="drift-bar drift-bottom">
+            <span class="drift-fill" [style.width]="pctWidth(r.bottom_pct)"></span>
+            <span class="drift-pct">{{ r.bottom_pct }}%</span>
+          </div>
+          <div class="drift-bar drift-recent">
+            <span class="drift-fill" [style.width]="pctWidth(r.recent_30_pct)"></span>
+            <span class="drift-pct">{{ r.recent_30_pct }}%</span>
+          </div>
+          <div class="drift-verdict">{{ driftVerdictLabel(r.verdict) }}</div>
+        </div>
+        }
+      </div>
+    </section>
     }
 
     <!-- Conditional levers -->
     @if (p?.conditional_levers?.length) {
-      <section class="sc-card">
-        <h3 class="sc-h-title">Conditional levers</h3>
-        <div class="lever-grid">
-          @for (l of p.conditional_levers; track $index) {
-            <div class="lever-card" [class.lever-thin]="(l.n_combined ?? 0) < 5">
-              <div class="lever-formula">
-                <code>{{ l.when?.tag }}</code>
-                <span class="lever-plus">×</span>
-                <code>{{ l.with?.tag }}</code>
-              </div>
-              <div class="lever-numbers">
-                <span class="lever-mult">{{ fmtNum(l.multiplier, 1) }}×</span>
-                <span class="lever-detail">
-                  {{ fmtNum(l.mean_alone, 3) }} alone → {{ fmtNum(l.mean_combined, 2) }} combined
-                </span>
-              </div>
-              <div class="lever-n">
-                n={{ l.n_combined }} combined / {{ l.n_alone }} alone
-                @if ((l.n_combined ?? 0) < 5) { <span class="lever-warn">· thin sample</span> }
-              </div>
-            </div>
-          }
+    <section class="sc-card">
+      <h3 class="sc-h-title">Conditional levers</h3>
+      <div class="lever-grid">
+        @for (l of p.conditional_levers; track $index) {
+        <div class="lever-card" [class.lever-thin]="(l.n_combined ?? 0) < 5">
+          <div class="lever-formula">
+            <code>{{ l.when?.tag }}</code>
+            <span class="lever-plus">×</span>
+            <code>{{ l.with?.tag }}</code>
+          </div>
+          <div class="lever-numbers">
+            <span class="lever-mult">{{ fmtNum(l.multiplier, 1) }}×</span>
+            <span class="lever-detail">
+              {{ fmtNum(l.mean_alone, 3) }} alone → {{ fmtNum(l.mean_combined, 2) }} combined
+            </span>
+          </div>
+          <div class="lever-n">
+            n={{ l.n_combined }} combined / {{ l.n_alone }} alone
+            @if ((l.n_combined ?? 0) < 5) { <span class="lever-warn">· thin sample</span> }
+          </div>
         </div>
-      </section>
+        }
+      </div>
+    </section>
     }
 
     <!-- Monthly trajectory (last 12 months) -->
     @if (recentTrajectory().length) {
-      <section class="sc-card">
-        <h3 class="sc-h-title">Monthly trajectory <span class="sc-h-sub">(last 12 months)</span></h3>
-        <div class="traj-grid">
-          @for (r of recentTrajectory(); track r.month) {
-            <div class="traj-row">
-              <span class="traj-month">{{ r.month }}</span>
-              <span class="traj-bar">
-                <span class="traj-fill" [style.width]="pctWidth((r.median_views / trajectoryMaxViews()) * 100)"></span>
-              </span>
-              <span class="traj-views">{{ r.median_views }}</span>
-              <span class="traj-n">{{ r.n_shorts }} shorts</span>
-            </div>
-          }
+    <section class="sc-card">
+      <h3 class="sc-h-title">Monthly trajectory <span class="sc-h-sub">(last 12 months)</span></h3>
+      <div class="traj-grid">
+        @for (r of recentTrajectory(); track r.month) {
+        <div class="traj-row">
+          <span class="traj-month">{{ r.month }}</span>
+          <span class="traj-bar">
+            <span class="traj-fill" [style.width]="pctWidth((r.median_views / trajectoryMaxViews()) * 100)"></span>
+          </span>
+          <span class="traj-views">{{ r.median_views }}</span>
+          <span class="traj-n">{{ r.n_shorts }} shorts</span>
         </div>
-      </section>
+        }
+      </div>
+    </section>
     }
 
     <!-- Tailwind caveats -->
     @if (p?.tailwind_caveats?.length) {
-      <section class="sc-card">
-        <h3 class="sc-h-title">Tailwind caveats <span class="sc-h-sub">— top videos with algorithm/external assist</span></h3>
-        <div class="tailwind-list">
-          @for (t of p.tailwind_caveats; track t.video_id) {
-            <div class="tailwind-row">
-              <div class="tw-head">
-                <span class="tw-title">{{ t.title }}</span>
-                <span class="tw-stats">breakout {{ fmtNum(t.breakout_score, 1) }} · residual {{ fmtNum(t.residual_ratio, 1) }}</span>
-              </div>
-              <p class="tw-summary">{{ t.summary }}</p>
-            </div>
-          }
+    <section class="sc-card">
+      <h3 class="sc-h-title">Tailwind caveats <span class="sc-h-sub">— top videos with algorithm/external assist</span>
+      </h3>
+      <div class="tailwind-list">
+        @for (t of p.tailwind_caveats; track t.video_id) {
+        <div class="tailwind-row">
+          <div class="tw-head">
+            <span class="tw-title">{{ t.title }}</span>
+            <span class="tw-stats">breakout {{ fmtNum(t.breakout_score, 1) }} · residual {{ fmtNum(t.residual_ratio, 1)
+              }}</span>
+          </div>
+          <p class="tw-summary">{{ t.summary }}</p>
         </div>
-      </section>
+        }
+      </div>
+    </section>
     }
 
     <!-- Missed-by-critic + experiments + open questions -->
     @if (p?.additional_actions_missed_by_critic?.length) {
-      <section class="sc-card sc-extras">
-        <h3 class="sc-h-title">Actions the critic added</h3>
-        <ul class="sc-bullet-list">
-          @for (x of p.additional_actions_missed_by_critic; track x) { <li>{{ x }}</li> }
-        </ul>
-      </section>
+    <section class="sc-card sc-extras">
+      <h3 class="sc-h-title">Actions the critic added</h3>
+      <ul class="sc-bullet-list">
+        @for (x of p.additional_actions_missed_by_critic; track x) { <li>{{ x }}</li> }
+      </ul>
+    </section>
     }
     @if (p?.experiment_substrates?.length) {
-      <section class="sc-card sc-extras">
-        <h3 class="sc-h-title">Experiment substrates</h3>
-        <ul class="sc-bullet-list">
-          @for (x of p.experiment_substrates; track x) { <li>{{ x }}</li> }
-        </ul>
-      </section>
+    <section class="sc-card sc-extras">
+      <h3 class="sc-h-title">Experiment substrates</h3>
+      <ul class="sc-bullet-list">
+        @for (x of p.experiment_substrates; track x) { <li>{{ x }}</li> }
+      </ul>
+    </section>
     }
     @if (p?.open_questions?.length) {
-      <section class="sc-card sc-extras">
-        <h3 class="sc-h-title">Open questions</h3>
-        <ul class="sc-bullet-list">
-          @for (x of p.open_questions; track x) { <li>{{ x }}</li> }
-        </ul>
-      </section>
+    <section class="sc-card sc-extras">
+      <h3 class="sc-h-title">Open questions</h3>
+      <ul class="sc-bullet-list">
+        @for (x of p.open_questions; track x) { <li>{{ x }}</li> }
+      </ul>
+    </section>
     }
   </div>
 </ng-template>
@@ -684,99 +600,99 @@
     <section class="tr-verdict" [ngClass]="'tr-v-' + (p?.verdict ?? 'unknown')">
       <div class="tr-verdict-pill">{{ p?.verdict }}</div>
       @if (p?.verdict === 'replace' && p?.recommended_title) {
-        <div class="tr-recommended">
-          <span class="tr-rec-label">Recommended:</span>
-          <span class="tr-rec-title">{{ p.recommended_title }}</span>
-        </div>
+      <div class="tr-recommended">
+        <span class="tr-rec-label">Recommended:</span>
+        <span class="tr-rec-title">{{ p.recommended_title }}</span>
+      </div>
       } @else if (p?.verdict === 'keep') {
-        <div class="tr-recommended">
-          <span class="tr-rec-label">Keep current:</span>
-          <span class="tr-rec-title">{{ p?.current_title }}</span>
-        </div>
+      <div class="tr-recommended">
+        <span class="tr-rec-label">Keep current:</span>
+        <span class="tr-rec-title">{{ p?.current_title }}</span>
+      </div>
       } @else {
-        <div class="tr-recommended">
-          <span class="tr-rec-label">Tied — current is roughly as good:</span>
-          <span class="tr-rec-title">{{ p?.current_title }}</span>
-        </div>
+      <div class="tr-recommended">
+        <span class="tr-rec-label">Tied — current is roughly as good:</span>
+        <span class="tr-rec-title">{{ p?.current_title }}</span>
+      </div>
       }
       @if (p?.verdict_reasoning) {
-        <p class="tr-verdict-reason">{{ p.verdict_reasoning }}</p>
+      <p class="tr-verdict-reason">{{ p.verdict_reasoning }}</p>
       }
     </section>
 
     <!-- Current title assessment -->
     @if (p?.current_title_assessment; as ca) {
-      <section class="sc-card">
-        <h3 class="sc-h-title">Current title</h3>
-        <div class="tr-current">"{{ p.current_title }}"</div>
-        @if (ca.summary) { <p class="tr-current-summary">{{ ca.summary }}</p> }
-        <div class="tr-pattern-row">
-          @if (ca.patterns_it_uses?.length) {
-            <div class="tr-pattern-block">
-              <span class="tr-pattern-label">Uses:</span>
-              @for (n of ca.patterns_it_uses; track n) {
-                <span class="tr-pattern-pill tr-pat-good">{{ n }}</span>
-              }
-            </div>
-          }
-          @if (ca.patterns_it_violates?.length) {
-            <div class="tr-pattern-block">
-              <span class="tr-pattern-label">Violates:</span>
-              @for (n of ca.patterns_it_violates; track n) {
-                <span class="tr-pattern-pill tr-pat-bad">{{ n }}</span>
-              }
-            </div>
+    <section class="sc-card">
+      <h3 class="sc-h-title">Current title</h3>
+      <div class="tr-current">"{{ p.current_title }}"</div>
+      @if (ca.summary) { <p class="tr-current-summary">{{ ca.summary }}</p> }
+      <div class="tr-pattern-row">
+        @if (ca.patterns_it_uses?.length) {
+        <div class="tr-pattern-block">
+          <span class="tr-pattern-label">Uses:</span>
+          @for (n of ca.patterns_it_uses; track n) {
+          <span class="tr-pattern-pill tr-pat-good">{{ n }}</span>
           }
         </div>
-      </section>
+        }
+        @if (ca.patterns_it_violates?.length) {
+        <div class="tr-pattern-block">
+          <span class="tr-pattern-label">Violates:</span>
+          @for (n of ca.patterns_it_violates; track n) {
+          <span class="tr-pattern-pill tr-pat-bad">{{ n }}</span>
+          }
+        </div>
+        }
+      </div>
+    </section>
     }
 
     <!-- Ranked alternatives -->
     @if (p?.ranked_alternatives?.length) {
-      <section class="sc-card">
-        <h3 class="sc-h-title">Ranked alternatives</h3>
-        <div class="tr-alts">
-          @for (a of p.ranked_alternatives; track a.rank) {
-            <div class="tr-alt" [class.tr-alt-rec]="isRecommendedAlt(a.rank)">
-              <div class="tr-alt-head">
-                <span class="tr-alt-rank">#{{ a.rank }}</span>
-                <span class="tr-alt-title">"{{ a.title }}"</span>
-                @if (typeof a.critic_score === 'number') {
-                  <span class="tr-alt-score" [class.tr-score-high]="a.critic_score >= 80"
-                                              [class.tr-score-low]="a.critic_score < 60">
-                    {{ a.critic_score }}
-                  </span>
-                }
-                @if (isRecommendedAlt(a.rank)) {
-                  <span class="tr-rec-badge">★ recommended</span>
-                }
-              </div>
-              @if (a.rationale) { <p class="tr-alt-rationale">{{ a.rationale }}</p> }
-              <div class="tr-pattern-row">
-                @if (a.patterns_used?.length) {
-                  <div class="tr-pattern-block">
-                    <span class="tr-pattern-label">Patterns:</span>
-                    @for (n of a.patterns_used; track n) {
-                      <span class="tr-pattern-pill tr-pat-good">{{ n }}</span>
-                    }
-                  </div>
-                }
-                @if (a.critic_says_uses_patterns === false) {
-                  <span class="tr-pattern-pill tr-pat-bad">critic disagrees</span>
-                }
-              </div>
-              @if (a.accuracy_check) {
-                <div class="tr-accuracy"><b>Accuracy:</b> {{ a.accuracy_check }}</div>
-              }
-              @if (a.critic_accuracy_concern) {
-                <div class="tr-accuracy tr-accuracy-warn">
-                  <b>Critic concern:</b> {{ a.critic_accuracy_concern }}
-                </div>
+    <section class="sc-card">
+      <h3 class="sc-h-title">Ranked alternatives</h3>
+      <div class="tr-alts">
+        @for (a of p.ranked_alternatives; track a.rank) {
+        <div class="tr-alt" [class.tr-alt-rec]="isRecommendedAlt(a.rank)">
+          <div class="tr-alt-head">
+            <span class="tr-alt-rank">#{{ a.rank }}</span>
+            <span class="tr-alt-title">"{{ a.title }}"</span>
+            @if (typeof a.critic_score === 'number') {
+            <span class="tr-alt-score" [class.tr-score-high]="a.critic_score >= 80"
+              [class.tr-score-low]="a.critic_score < 60">
+              {{ a.critic_score }}
+            </span>
+            }
+            @if (isRecommendedAlt(a.rank)) {
+            <span class="tr-rec-badge">★ recommended</span>
+            }
+          </div>
+          @if (a.rationale) { <p class="tr-alt-rationale">{{ a.rationale }}</p> }
+          <div class="tr-pattern-row">
+            @if (a.patterns_used?.length) {
+            <div class="tr-pattern-block">
+              <span class="tr-pattern-label">Patterns:</span>
+              @for (n of a.patterns_used; track n) {
+              <span class="tr-pattern-pill tr-pat-good">{{ n }}</span>
               }
             </div>
+            }
+            @if (a.critic_says_uses_patterns === false) {
+            <span class="tr-pattern-pill tr-pat-bad">critic disagrees</span>
+            }
+          </div>
+          @if (a.accuracy_check) {
+          <div class="tr-accuracy"><b>Accuracy:</b> {{ a.accuracy_check }}</div>
+          }
+          @if (a.critic_accuracy_concern) {
+          <div class="tr-accuracy tr-accuracy-warn">
+            <b>Critic concern:</b> {{ a.critic_accuracy_concern }}
+          </div>
           }
         </div>
-      </section>
+        }
+      </div>
+    </section>
     }
   </div>
 </ng-template>
@@ -794,103 +710,103 @@
       <section class="sc-card tp-side tp-use">
         <h3 class="sc-h-title">Patterns to use</h3>
         @if (p?.patterns_to_use?.length) {
-          @for (pat of p.patterns_to_use; track pat.name) {
-            <div class="tp-pattern">
-              <div class="tp-pat-head">
-                <code class="tp-name">{{ pat.name }}</code>
-                @if (typeof pat.median_breakout_when_present === 'number') {
-                  <span class="tp-median">median {{ fmtNum(pat.median_breakout_when_present) }}×</span>
-                }
-                @if (pat.critic_verdict) {
-                  <span class="sc-verdict-pill" [ngClass]="criticVerdictClass(pat.critic_verdict)">
-                    {{ pat.critic_verdict }}
-                  </span>
-                }
-              </div>
-              <p class="tp-desc">{{ pat.description }}</p>
-              @if (pat.rationale) { <p class="tp-rationale">{{ pat.rationale }}</p> }
-              @if (pat.evidence_titles_above_median?.length) {
-                <div class="tp-evidence">
-                  <span class="tp-ev-label">Evidence:</span>
-                  <ul>
-                    @for (t of pat.evidence_titles_above_median; track t) {
-                      <li class="tp-ev-good">"{{ t }}"</li>
-                    }
-                    @for (t of pat.evidence_titles_below_median ?? []; track t) {
-                      <li class="tp-ev-bad">counter: "{{ t }}"</li>
-                    }
-                  </ul>
-                </div>
+        @for (pat of p.patterns_to_use; track pat.name) {
+        <div class="tp-pattern">
+          <div class="tp-pat-head">
+            <code class="tp-name">{{ pat.name }}</code>
+            @if (typeof pat.median_breakout_when_present === 'number') {
+            <span class="tp-median">median {{ fmtNum(pat.median_breakout_when_present) }}×</span>
+            }
+            @if (pat.critic_verdict) {
+            <span class="sc-verdict-pill" [ngClass]="criticVerdictClass(pat.critic_verdict)">
+              {{ pat.critic_verdict }}
+            </span>
+            }
+          </div>
+          <p class="tp-desc">{{ pat.description }}</p>
+          @if (pat.rationale) { <p class="tp-rationale">{{ pat.rationale }}</p> }
+          @if (pat.evidence_titles_above_median?.length) {
+          <div class="tp-evidence">
+            <span class="tp-ev-label">Evidence:</span>
+            <ul>
+              @for (t of pat.evidence_titles_above_median; track t) {
+              <li class="tp-ev-good">"{{ t }}"</li>
               }
-              @if (pat.critic_reasoning) {
-                <div class="sc-critique-inline">
-                  <span class="sc-critique-label">critic:</span>
-                  <span class="sc-critique-text">{{ pat.critic_reasoning }}</span>
-                </div>
+              @for (t of pat.evidence_titles_below_median ?? []; track t) {
+              <li class="tp-ev-bad">counter: "{{ t }}"</li>
               }
-            </div>
+            </ul>
+          </div>
           }
+          @if (pat.critic_reasoning) {
+          <div class="sc-critique-inline">
+            <span class="sc-critique-label">critic:</span>
+            <span class="sc-critique-text">{{ pat.critic_reasoning }}</span>
+          </div>
+          }
+        </div>
+        }
         } @else { <div class="empty-msg">none</div> }
       </section>
 
       <section class="sc-card tp-side tp-avoid">
         <h3 class="sc-h-title">Patterns to avoid</h3>
         @if (p?.patterns_to_avoid?.length) {
-          @for (pat of p.patterns_to_avoid; track pat.name) {
-            <div class="tp-pattern">
-              <div class="tp-pat-head">
-                <code class="tp-name">{{ pat.name }}</code>
-                @if (typeof pat.median_breakout_when_present === 'number') {
-                  <span class="tp-median tp-median-bad">median {{ fmtNum(pat.median_breakout_when_present) }}×</span>
-                }
-                @if (pat.critic_verdict) {
-                  <span class="sc-verdict-pill" [ngClass]="criticVerdictClass(pat.critic_verdict)">
-                    {{ pat.critic_verdict }}
-                  </span>
-                }
-              </div>
-              <p class="tp-desc">{{ pat.description }}</p>
-              @if (pat.rationale) { <p class="tp-rationale">{{ pat.rationale }}</p> }
-              @if (pat.evidence_titles_below_median?.length) {
-                <div class="tp-evidence">
-                  <span class="tp-ev-label">Evidence:</span>
-                  <ul>
-                    @for (t of pat.evidence_titles_below_median; track t) {
-                      <li class="tp-ev-bad">"{{ t }}"</li>
-                    }
-                    @for (t of pat.evidence_titles_above_median ?? []; track t) {
-                      <li class="tp-ev-good">counter: "{{ t }}"</li>
-                    }
-                  </ul>
-                </div>
+        @for (pat of p.patterns_to_avoid; track pat.name) {
+        <div class="tp-pattern">
+          <div class="tp-pat-head">
+            <code class="tp-name">{{ pat.name }}</code>
+            @if (typeof pat.median_breakout_when_present === 'number') {
+            <span class="tp-median tp-median-bad">median {{ fmtNum(pat.median_breakout_when_present) }}×</span>
+            }
+            @if (pat.critic_verdict) {
+            <span class="sc-verdict-pill" [ngClass]="criticVerdictClass(pat.critic_verdict)">
+              {{ pat.critic_verdict }}
+            </span>
+            }
+          </div>
+          <p class="tp-desc">{{ pat.description }}</p>
+          @if (pat.rationale) { <p class="tp-rationale">{{ pat.rationale }}</p> }
+          @if (pat.evidence_titles_below_median?.length) {
+          <div class="tp-evidence">
+            <span class="tp-ev-label">Evidence:</span>
+            <ul>
+              @for (t of pat.evidence_titles_below_median; track t) {
+              <li class="tp-ev-bad">"{{ t }}"</li>
               }
-              @if (pat.critic_reasoning) {
-                <div class="sc-critique-inline">
-                  <span class="sc-critique-label">critic:</span>
-                  <span class="sc-critique-text">{{ pat.critic_reasoning }}</span>
-                </div>
+              @for (t of pat.evidence_titles_above_median ?? []; track t) {
+              <li class="tp-ev-good">counter: "{{ t }}"</li>
               }
-            </div>
+            </ul>
+          </div>
           }
+          @if (pat.critic_reasoning) {
+          <div class="sc-critique-inline">
+            <span class="sc-critique-label">critic:</span>
+            <span class="sc-critique-text">{{ pat.critic_reasoning }}</span>
+          </div>
+          }
+        </div>
+        }
         } @else { <div class="empty-msg">none</div> }
       </section>
     </div>
 
     @if (p?.missing_patterns_flagged_by_critic?.length) {
-      <section class="sc-card sc-extras">
-        <h3 class="sc-h-title">Missing patterns flagged by the critic</h3>
-        <ul class="sc-bullet-list">
-          @for (m of p.missing_patterns_flagged_by_critic; track m) { <li>{{ m }}</li> }
-        </ul>
-      </section>
+    <section class="sc-card sc-extras">
+      <h3 class="sc-h-title">Missing patterns flagged by the critic</h3>
+      <ul class="sc-bullet-list">
+        @for (m of p.missing_patterns_flagged_by_critic; track m) { <li>{{ m }}</li> }
+      </ul>
+    </section>
     }
     @if (p?.open_questions?.length) {
-      <section class="sc-card sc-extras">
-        <h3 class="sc-h-title">Open questions</h3>
-        <ul class="sc-bullet-list">
-          @for (q of p.open_questions; track q) { <li>{{ q }}</li> }
-        </ul>
-      </section>
+    <section class="sc-card sc-extras">
+      <h3 class="sc-h-title">Open questions</h3>
+      <ul class="sc-bullet-list">
+        @for (q of p.open_questions; track q) { <li>{{ q }}</li> }
+      </ul>
+    </section>
     }
   </div>
 </ng-template>
@@ -903,124 +819,125 @@
       <h2 class="sc-h-title">Top capability gaps</h2>
       <p class="sc-headline-text">{{ p?.headline ?? '—' }}</p>
       @if (p?.headline_critique) {
-        <div class="sc-critique">
-          <span class="sc-critique-label">critic:</span>
-          <span class="sc-critique-text">{{ p.headline_critique }}</span>
-        </div>
+      <div class="sc-critique">
+        <span class="sc-critique-label">critic:</span>
+        <span class="sc-critique-text">{{ p.headline_critique }}</span>
+      </div>
       }
       <div class="cg-meta">
         <span><b>{{ p?.prioritized_gaps?.length ?? 0 }}</b> recommended</span>
         <span>·</span>
         <span>from <b>{{ p?.n_candidate_gaps ?? 0 }}</b> eligible build candidates</span>
         @if (p?.manifest_version) {
-          <span>·</span>
-          <span>manifest v{{ p.manifest_version }}</span>
+        <span>·</span>
+        <span>manifest v{{ p.manifest_version }}</span>
         }
       </div>
     </section>
 
     <!-- Prioritized gaps -->
     @if (p?.prioritized_gaps?.length) {
-      <section class="sc-card">
-        <h3 class="sc-h-title">Build proposals</h3>
-        <div class="cg-gaps">
-          @for (g of p.prioritized_gaps; track g.rank) {
-            <div class="cg-gap" [ngClass]="criticVerdictClass(g.critic_verdict)">
-              <div class="cg-gap-head">
-                <span class="sc-action-rank">#{{ g.rank }}</span>
-                <code class="cg-tag">{{ g.tag }}</code>
-                <span class="cg-axis">{{ g.axis }}</span>
-                @if (g.effort_estimate) {
-                  <span class="cg-effort cg-effort-{{ g.effort_estimate }}">
-                    {{ g.effort_estimate }}
-                  </span>
-                }
-                <span class="sc-verdict-pill" [ngClass]="criticVerdictClass(g.critic_verdict)">
-                  {{ g.critic_verdict ?? 'unreviewed' }}
-                </span>
-              </div>
+    <section class="sc-card">
+      <h3 class="sc-h-title">Build proposals</h3>
+      <div class="cg-gaps">
+        @for (g of p.prioritized_gaps; track g.rank) {
+        <div class="cg-gap" [ngClass]="criticVerdictClass(g.critic_verdict)">
+          <div class="cg-gap-head">
+            <span class="sc-action-rank">#{{ g.rank }}</span>
+            <code class="cg-tag">{{ g.tag }}</code>
+            <span class="cg-axis">{{ g.axis }}</span>
+            @if (g.effort_estimate) {
+            <span class="cg-effort cg-effort-{{ g.effort_estimate }}">
+              {{ g.effort_estimate }}
+            </span>
+            }
+            <span class="sc-verdict-pill" [ngClass]="criticVerdictClass(g.critic_verdict)">
+              {{ g.critic_verdict ?? 'unreviewed' }}
+            </span>
+          </div>
 
-              <div class="cg-build">
-                <span class="cg-label">Build:</span>
-                <span class="cg-build-text">{{ g.build_proposal }}</span>
-              </div>
-              @if (g.implementation_module) {
-                <div class="cg-module">
-                  <span class="cg-label">Module:</span>
-                  <code>{{ g.implementation_module }}</code>
-                </div>
-              }
-              @if (g.rationale) {
-                <p class="sc-action-rationale">{{ g.rationale }}</p>
-              }
-              @if (g.evidence_cited; as ev) {
-                <div class="cg-evidence">
-                  @if (ev.lift_top_vs_overall != null) {
-                    <span><b>{{ fmtNum(ev.lift_top_vs_overall) }}×</b> lift</span>
-                  }
-                  @if (ev.n_in_top != null) {
-                    <span>·</span>
-                    <span><b>n={{ ev.n_in_top }}</b> in top quintile</span>
-                  }
-                  @if (ev.avg_breakout_when_present != null) {
-                    <span>·</span>
-                    <span><b>{{ fmtNum(ev.avg_breakout_when_present) }}×</b> avg breakout when present</span>
-                  }
-                </div>
-              }
-              @if (g.experiment_to_validate) {
-                <div class="cg-experiment">
-                  <span class="cg-label">Experiment:</span>
-                  <span>{{ g.experiment_to_validate }}</span>
-                </div>
-              }
-              @if (g.critic_reasoning) {
-                <div class="sc-critique-inline">
-                  <span class="sc-critique-label">critic:</span>
-                  <span class="sc-critique-text">{{ g.critic_reasoning }}</span>
-                </div>
-              }
-            </div>
+          <div class="cg-build">
+            <span class="cg-label">Build:</span>
+            <span class="cg-build-text">{{ g.build_proposal }}</span>
+          </div>
+          @if (g.implementation_module) {
+          <div class="cg-module">
+            <span class="cg-label">Module:</span>
+            <code>{{ g.implementation_module }}</code>
+          </div>
+          }
+          @if (g.rationale) {
+          <p class="sc-action-rationale">{{ g.rationale }}</p>
+          }
+          @if (g.evidence_cited; as ev) {
+          <div class="cg-evidence">
+            @if (ev.lift_top_vs_overall != null) {
+            <span><b>{{ fmtNum(ev.lift_top_vs_overall) }}×</b> lift</span>
+            }
+            @if (ev.n_in_top != null) {
+            <span>·</span>
+            <span><b>n={{ ev.n_in_top }}</b> in top quintile</span>
+            }
+            @if (ev.avg_breakout_when_present != null) {
+            <span>·</span>
+            <span><b>{{ fmtNum(ev.avg_breakout_when_present) }}×</b> avg breakout when present</span>
+            }
+          </div>
+          }
+          @if (g.experiment_to_validate) {
+          <div class="cg-experiment">
+            <span class="cg-label">Experiment:</span>
+            <span>{{ g.experiment_to_validate }}</span>
+          </div>
+          }
+          @if (g.critic_reasoning) {
+          <div class="sc-critique-inline">
+            <span class="sc-critique-label">critic:</span>
+            <span class="sc-critique-text">{{ g.critic_reasoning }}</span>
+          </div>
           }
         </div>
-      </section>
+        }
+      </div>
+    </section>
     }
 
     <!-- Negative signals: do not build -->
     @if (p?.warnings_against_building?.length) {
-      <section class="sc-card cg-warnings">
-        <h3 class="sc-h-title">Do NOT build <span class="sc-h-sub">— these tags are more common in losers than winners</span></h3>
-        <div class="cg-warn-grid">
-          @for (w of p.warnings_against_building; track w.tag) {
-            <div class="cg-warn">
-              <div class="cg-warn-head">
-                <code class="cg-tag">{{ w.tag }}</code>
-                <span class="cg-axis">{{ w.axis }}</span>
-              </div>
-              <div class="cg-warn-bars">
-                <span class="cg-bar cg-bar-top">
-                  <span class="cg-bar-fill" [style.width]="pctWidth(w.top_rate * 100)"></span>
-                  <span class="cg-bar-pct">top {{ fmtNum(w.top_rate * 100, 0) }}%</span>
-                </span>
-                <span class="cg-bar cg-bar-bottom">
-                  <span class="cg-bar-fill" [style.width]="pctWidth(w.bottom_rate * 100)"></span>
-                  <span class="cg-bar-pct">bot {{ fmtNum(w.bottom_rate * 100, 0) }}%</span>
-                </span>
-              </div>
-            </div>
-          }
+    <section class="sc-card cg-warnings">
+      <h3 class="sc-h-title">Do NOT build <span class="sc-h-sub">— these tags are more common in losers than
+          winners</span></h3>
+      <div class="cg-warn-grid">
+        @for (w of p.warnings_against_building; track w.tag) {
+        <div class="cg-warn">
+          <div class="cg-warn-head">
+            <code class="cg-tag">{{ w.tag }}</code>
+            <span class="cg-axis">{{ w.axis }}</span>
+          </div>
+          <div class="cg-warn-bars">
+            <span class="cg-bar cg-bar-top">
+              <span class="cg-bar-fill" [style.width]="pctWidth(w.top_rate * 100)"></span>
+              <span class="cg-bar-pct">top {{ fmtNum(w.top_rate * 100, 0) }}%</span>
+            </span>
+            <span class="cg-bar cg-bar-bottom">
+              <span class="cg-bar-fill" [style.width]="pctWidth(w.bottom_rate * 100)"></span>
+              <span class="cg-bar-pct">bot {{ fmtNum(w.bottom_rate * 100, 0) }}%</span>
+            </span>
+          </div>
         </div>
-      </section>
+        }
+      </div>
+    </section>
     }
 
     <!-- Critic-flagged gaps the generator skipped -->
     @if (p?.missed_gaps_worth_considering?.length) {
-      <section class="sc-card sc-extras">
-        <h3 class="sc-h-title">Critic-flagged gaps the generator skipped</h3>
-        <ul class="sc-bullet-list">
-          @for (m of p.missed_gaps_worth_considering; track m) { <li>{{ m }}</li> }
-        </ul>
-      </section>
+    <section class="sc-card sc-extras">
+      <h3 class="sc-h-title">Critic-flagged gaps the generator skipped</h3>
+      <ul class="sc-bullet-list">
+        @for (m of p.missed_gaps_worth_considering; track m) { <li>{{ m }}</li> }
+      </ul>
+    </section>
     }
   </div>
 </ng-template>
@@ -1030,214 +947,214 @@
   <div class="er-pane">
     <!-- Advisory mode: simpleautosubs hasn't shipped editorial_decisions yet -->
     @if (p?.advisory_only) {
-      <section class="er-advisory-banner">
-        <div class="er-advisory-title">Awaiting editorial data from SimpleAutoSubs</div>
-        <p class="er-advisory-text">{{ p?.advisory_summary }}</p>
-      </section>
-      @if (p?.checklist?.length) {
-        <section class="sc-card">
-          <h3 class="sc-h-title">Pattern-level checklist</h3>
-          <ul class="er-checklist">
-            @for (c of p.checklist; track c.check) {
-              <li>
-                <span class="er-check-label">{{ c.check }}</span>
-                <span class="er-check-rationale">{{ c.rationale }}</span>
-              </li>
-            }
-          </ul>
-        </section>
-      }
+    <section class="er-advisory-banner">
+      <div class="er-advisory-title">Awaiting editorial data from SimpleAutoSubs</div>
+      <p class="er-advisory-text">{{ p?.advisory_summary }}</p>
+    </section>
+    @if (p?.checklist?.length) {
+    <section class="sc-card">
+      <h3 class="sc-h-title">Pattern-level checklist</h3>
+      <ul class="er-checklist">
+        @for (c of p.checklist; track c.check) {
+        <li>
+          <span class="er-check-label">{{ c.check }}</span>
+          <span class="er-check-rationale">{{ c.rationale }}</span>
+        </li>
+        }
+      </ul>
+    </section>
+    }
     } @else {
-      <!-- Verdict + iteration progress banner -->
-      <section class="er-verdict" [ngClass]="'er-v-' + (p?.verdict ?? 'unknown')">
-        <div class="er-verdict-row">
-          <div class="er-verdict-pill">{{ p?.verdict }}</div>
-          <div class="er-iter-progress">
-            iteration <b>{{ p?.iteration_reviewed }}</b>
-            of <b>{{ p?.max_iterations_known }}</b>
-          </div>
-          @if (p?.current_score != null) {
-            <div class="er-score-pill"
-                 [class.er-score-good]="p.current_score >= 80"
-                 [class.er-score-poor]="p.current_score < 60">
-              score <b>{{ p.current_score }}</b>
-            </div>
-          }
+    <!-- Verdict + iteration progress banner -->
+    <section class="er-verdict" [ngClass]="'er-v-' + (p?.verdict ?? 'unknown')">
+      <div class="er-verdict-row">
+        <div class="er-verdict-pill">{{ p?.verdict }}</div>
+        <div class="er-iter-progress">
+          iteration <b>{{ p?.iteration_reviewed }}</b>
+          of <b>{{ p?.max_iterations_known }}</b>
         </div>
-        @if (p?.verdict === 'ship_current') {
-          <div class="er-recommended">
-            <span class="er-rec-label">Ship iteration:</span>
-            <span class="er-rec-value">v{{ p?.ship_which_iteration }} (current)</span>
-          </div>
-        } @else if (p?.verdict === 'ship_prior') {
-          <div class="er-recommended">
-            <span class="er-rec-label">Ship iteration:</span>
-            <span class="er-rec-value">v{{ p?.ship_which_iteration }} (a prior cut scored higher)</span>
-          </div>
-        } @else if (p?.verdict === 'needs_edits') {
-          <div class="er-recommended">
-            <span class="er-rec-label">Recommended:</span>
-            <span class="er-rec-value">re-cut with directives below; projected gain {{ p?.projected_improvement }} pts</span>
-          </div>
-        }
-        @if (p?.review_summary) {
-          <p class="er-review-summary">{{ p.review_summary }}</p>
-        }
-      </section>
-
-      <!-- Score breakdown + concerns -->
-      <div class="er-grid">
-        @if (p?.score_breakdown; as sb) {
-          <section class="sc-card">
-            <h3 class="sc-h-title">Score breakdown</h3>
-            <div class="er-sb">
-              @if (sb.channel_pattern_alignment != null) {
-                <div class="er-sb-row">
-                  <span class="er-sb-label">channel pattern alignment</span>
-                  <span class="er-sb-bar"><span class="er-sb-fill" [style.width]="pctWidth(sb.channel_pattern_alignment)"></span></span>
-                  <span class="er-sb-num">{{ sb.channel_pattern_alignment }}</span>
-                </div>
-              }
-              @if (sb.capability_use != null) {
-                <div class="er-sb-row">
-                  <span class="er-sb-label">capability use</span>
-                  <span class="er-sb-bar"><span class="er-sb-fill" [style.width]="pctWidth(sb.capability_use)"></span></span>
-                  <span class="er-sb-num">{{ sb.capability_use }}</span>
-                </div>
-              }
-              @if (sb.punch_clarity != null) {
-                <div class="er-sb-row">
-                  <span class="er-sb-label">punch clarity</span>
-                  <span class="er-sb-bar"><span class="er-sb-fill" [style.width]="pctWidth(sb.punch_clarity)"></span></span>
-                  <span class="er-sb-num">{{ sb.punch_clarity }}</span>
-                </div>
-              }
-            </div>
-          </section>
-        }
-
-        @if (p?.concerns?.length) {
-          <section class="sc-card">
-            <h3 class="sc-h-title">Concerns</h3>
-            <ul class="sc-bullet-list">
-              @for (c of p.concerns; track c) { <li>{{ c }}</li> }
-            </ul>
-          </section>
+        @if (p?.current_score != null) {
+        <div class="er-score-pill" [class.er-score-good]="p.current_score >= 80"
+          [class.er-score-poor]="p.current_score < 60">
+          score <b>{{ p.current_score }}</b>
+        </div>
         }
       </div>
+      @if (p?.verdict === 'ship_current') {
+      <div class="er-recommended">
+        <span class="er-rec-label">Ship iteration:</span>
+        <span class="er-rec-value">v{{ p?.ship_which_iteration }} (current)</span>
+      </div>
+      } @else if (p?.verdict === 'ship_prior') {
+      <div class="er-recommended">
+        <span class="er-rec-label">Ship iteration:</span>
+        <span class="er-rec-value">v{{ p?.ship_which_iteration }} (a prior cut scored higher)</span>
+      </div>
+      } @else if (p?.verdict === 'needs_edits') {
+      <div class="er-recommended">
+        <span class="er-rec-label">Recommended:</span>
+        <span class="er-rec-value">re-cut with directives below; projected gain {{ p?.projected_improvement }}
+          pts</span>
+      </div>
+      }
+      @if (p?.review_summary) {
+      <p class="er-review-summary">{{ p.review_summary }}</p>
+      }
+    </section>
 
-      <!-- Edit directives (only if needs_edits) -->
-      @if (p?.verdict === 'needs_edits' && p?.edit_directives; as ed) {
-        <section class="sc-card er-directives">
-          <h3 class="sc-h-title">Edit directives <span class="sc-h-sub">— for SimpleAutoSubs to apply</span></h3>
+    <!-- Score breakdown + concerns -->
+    <div class="er-grid">
+      @if (p?.score_breakdown; as sb) {
+      <section class="sc-card">
+        <h3 class="sc-h-title">Score breakdown</h3>
+        <div class="er-sb">
+          @if (sb.channel_pattern_alignment != null) {
+          <div class="er-sb-row">
+            <span class="er-sb-label">channel pattern alignment</span>
+            <span class="er-sb-bar"><span class="er-sb-fill"
+                [style.width]="pctWidth(sb.channel_pattern_alignment)"></span></span>
+            <span class="er-sb-num">{{ sb.channel_pattern_alignment }}</span>
+          </div>
+          }
+          @if (sb.capability_use != null) {
+          <div class="er-sb-row">
+            <span class="er-sb-label">capability use</span>
+            <span class="er-sb-bar"><span class="er-sb-fill" [style.width]="pctWidth(sb.capability_use)"></span></span>
+            <span class="er-sb-num">{{ sb.capability_use }}</span>
+          </div>
+          }
+          @if (sb.punch_clarity != null) {
+          <div class="er-sb-row">
+            <span class="er-sb-label">punch clarity</span>
+            <span class="er-sb-bar"><span class="er-sb-fill" [style.width]="pctWidth(sb.punch_clarity)"></span></span>
+            <span class="er-sb-num">{{ sb.punch_clarity }}</span>
+          </div>
+          }
+        </div>
+      </section>
+      }
 
-          @if (ed.retrim?.should_retrim) {
-            <div class="er-dir-block">
-              <span class="er-dir-type">retrim</span>
-              <span class="er-dir-text">{{ ed.retrim.reason }}</span>
-              @if (ed.retrim.new_segments_to_keep?.length) {
-                <code class="er-dir-segments">
+      @if (p?.concerns?.length) {
+      <section class="sc-card">
+        <h3 class="sc-h-title">Concerns</h3>
+        <ul class="sc-bullet-list">
+          @for (c of p.concerns; track c) { <li>{{ c }}</li> }
+        </ul>
+      </section>
+      }
+    </div>
+
+    <!-- Edit directives (only if needs_edits) -->
+    @if (p?.verdict === 'needs_edits' && p?.edit_directives; as ed) {
+    <section class="sc-card er-directives">
+      <h3 class="sc-h-title">Edit directives <span class="sc-h-sub">— for SimpleAutoSubs to apply</span></h3>
+
+      @if (ed.retrim?.should_retrim) {
+      <div class="er-dir-block">
+        <span class="er-dir-type">retrim</span>
+        <span class="er-dir-text">{{ ed.retrim.reason }}</span>
+        @if (ed.retrim.new_segments_to_keep?.length) {
+        <code class="er-dir-segments">
                   segments: {{ ed.retrim.new_segments_to_keep | json }}
                 </code>
-              }
-            </div>
-          }
-
-          @if (ed.cinematography_changes?.length) {
-            <div class="er-dir-section">
-              <h4 class="er-dir-section-title">Cinematography</h4>
-              @for (c of ed.cinematography_changes; track $index) {
-                <div class="er-dir-block">
-                  <span class="er-dir-type er-dir-type-{{ c.type }}">{{ c.type }}</span>
-                  <span class="er-dir-time">t={{ fmtNum(c.at_time, 1) }}s</span>
-                  @if (c.from_action) { <code class="er-dir-action">{{ c.from_action }}</code> }
-                  @if (c.from_action && c.to_action) { <span class="er-dir-arrow">→</span> }
-                  @if (c.to_action) { <code class="er-dir-action">{{ c.to_action }}</code> }
-                  @if (c.duration) { <span class="er-dir-duration">{{ fmtNum(c.duration, 1) }}s</span> }
-                  <span class="er-dir-reason">{{ c.reason }}</span>
-                </div>
-              }
-            </div>
-          }
-
-          @if (ed.onomatopoeia_changes?.length) {
-            <div class="er-dir-section">
-              <h4 class="er-dir-section-title">Onomatopoeia</h4>
-              @for (c of ed.onomatopoeia_changes; track $index) {
-                <div class="er-dir-block">
-                  <span class="er-dir-type er-dir-type-{{ c.type }}">{{ c.type }}</span>
-                  <span class="er-dir-time">t={{ fmtNum(c.at_time, 1) }}s</span>
-                  @if (c.word) { <code class="er-dir-action">{{ c.word }}</code> }
-                  @if (c.animation) { <code class="er-dir-action">{{ c.animation }}</code> }
-                  @if (c.intensity != null) { <span class="er-dir-duration">i={{ fmtNum(c.intensity, 2) }}</span> }
-                  <span class="er-dir-reason">{{ c.reason }}</span>
-                </div>
-              }
-            </div>
-          }
-
-          @if (ed.subtitle_changes?.length) {
-            <div class="er-dir-section">
-              <h4 class="er-dir-section-title">Subtitles</h4>
-              @for (c of ed.subtitle_changes; track $index) {
-                <div class="er-dir-block">
-                  <span class="er-dir-type">{{ c.type }}</span>
-                  <span class="er-dir-reason">{{ c.reason }}</span>
-                </div>
-              }
-            </div>
-          }
-
-          @if (p?.directives_dropped_by_critic?.length) {
-            <div class="er-dropped">
-              <span class="sc-critique-label">critic dropped:</span>
-              <ul>
-                @for (d of p.directives_dropped_by_critic; track d.directive_path) {
-                  <li><code>{{ d.directive_path }}</code> — {{ d.reason }}</li>
-                }
-              </ul>
-            </div>
-          }
-        </section>
+        }
+      </div>
       }
 
-      <!-- Iterations seen so far -->
-      @if (p?.iterations_seen?.length) {
-        <section class="sc-card">
-          <h3 class="sc-h-title">Iteration history</h3>
-          <div class="er-iters">
-            @for (it of p.iterations_seen; track it.iteration) {
-              <div class="er-iter" [class.er-iter-best]="it.iteration === p?.ship_which_iteration">
-                <span class="er-iter-num">v{{ it.iteration }}</span>
-                <span class="er-iter-score"
-                      [class.er-score-good]="it.score >= 80"
-                      [class.er-score-poor]="it.score < 60">{{ it.score }}</span>
-                <span class="er-iter-verdict">{{ it.verdict }}</span>
-                <span class="er-iter-summary">{{ it.summary }}</span>
-              </div>
-            }
-          </div>
-        </section>
+      @if (ed.cinematography_changes?.length) {
+      <div class="er-dir-section">
+        <h4 class="er-dir-section-title">Cinematography</h4>
+        @for (c of ed.cinematography_changes; track $index) {
+        <div class="er-dir-block">
+          <span class="er-dir-type er-dir-type-{{ c.type }}">{{ c.type }}</span>
+          <span class="er-dir-time">t={{ fmtNum(c.at_time, 1) }}s</span>
+          @if (c.from_action) { <code class="er-dir-action">{{ c.from_action }}</code> }
+          @if (c.from_action && c.to_action) { <span class="er-dir-arrow">→</span> }
+          @if (c.to_action) { <code class="er-dir-action">{{ c.to_action }}</code> }
+          @if (c.duration) { <span class="er-dir-duration">{{ fmtNum(c.duration, 1) }}s</span> }
+          <span class="er-dir-reason">{{ c.reason }}</span>
+        </div>
+        }
+      </div>
       }
 
-      <!-- Critique callouts -->
-      @if (p?.score_critique || p?.verdict_critique) {
-        <section class="sc-card sc-extras">
-          <h3 class="sc-h-title">Critic notes</h3>
-          @if (p?.score_critique) {
-            <div class="sc-critique-inline">
-              <span class="sc-critique-label">on score:</span>
-              <span class="sc-critique-text">{{ p.score_critique }}</span>
-            </div>
-          }
-          @if (p?.verdict_critique) {
-            <div class="sc-critique-inline">
-              <span class="sc-critique-label">on verdict:</span>
-              <span class="sc-critique-text">{{ p.verdict_critique }}</span>
-            </div>
-          }
-        </section>
+      @if (ed.onomatopoeia_changes?.length) {
+      <div class="er-dir-section">
+        <h4 class="er-dir-section-title">Onomatopoeia</h4>
+        @for (c of ed.onomatopoeia_changes; track $index) {
+        <div class="er-dir-block">
+          <span class="er-dir-type er-dir-type-{{ c.type }}">{{ c.type }}</span>
+          <span class="er-dir-time">t={{ fmtNum(c.at_time, 1) }}s</span>
+          @if (c.word) { <code class="er-dir-action">{{ c.word }}</code> }
+          @if (c.animation) { <code class="er-dir-action">{{ c.animation }}</code> }
+          @if (c.intensity != null) { <span class="er-dir-duration">i={{ fmtNum(c.intensity, 2) }}</span> }
+          <span class="er-dir-reason">{{ c.reason }}</span>
+        </div>
+        }
+      </div>
       }
+
+      @if (ed.subtitle_changes?.length) {
+      <div class="er-dir-section">
+        <h4 class="er-dir-section-title">Subtitles</h4>
+        @for (c of ed.subtitle_changes; track $index) {
+        <div class="er-dir-block">
+          <span class="er-dir-type">{{ c.type }}</span>
+          <span class="er-dir-reason">{{ c.reason }}</span>
+        </div>
+        }
+      </div>
+      }
+
+      @if (p?.directives_dropped_by_critic?.length) {
+      <div class="er-dropped">
+        <span class="sc-critique-label">critic dropped:</span>
+        <ul>
+          @for (d of p.directives_dropped_by_critic; track d.directive_path) {
+          <li><code>{{ d.directive_path }}</code> — {{ d.reason }}</li>
+          }
+        </ul>
+      </div>
+      }
+    </section>
+    }
+
+    <!-- Iterations seen so far -->
+    @if (p?.iterations_seen?.length) {
+    <section class="sc-card">
+      <h3 class="sc-h-title">Iteration history</h3>
+      <div class="er-iters">
+        @for (it of p.iterations_seen; track it.iteration) {
+        <div class="er-iter" [class.er-iter-best]="it.iteration === p?.ship_which_iteration">
+          <span class="er-iter-num">v{{ it.iteration }}</span>
+          <span class="er-iter-score" [class.er-score-good]="it.score >= 80" [class.er-score-poor]="it.score < 60">{{
+            it.score }}</span>
+          <span class="er-iter-verdict">{{ it.verdict }}</span>
+          <span class="er-iter-summary">{{ it.summary }}</span>
+        </div>
+        }
+      </div>
+    </section>
+    }
+
+    <!-- Critique callouts -->
+    @if (p?.score_critique || p?.verdict_critique) {
+    <section class="sc-card sc-extras">
+      <h3 class="sc-h-title">Critic notes</h3>
+      @if (p?.score_critique) {
+      <div class="sc-critique-inline">
+        <span class="sc-critique-label">on score:</span>
+        <span class="sc-critique-text">{{ p.score_critique }}</span>
+      </div>
+      }
+      @if (p?.verdict_critique) {
+      <div class="sc-critique-inline">
+        <span class="sc-critique-label">on verdict:</span>
+        <span class="sc-critique-text">{{ p.verdict_critique }}</span>
+      </div>
+      }
+    </section>
+    }
     }
   </div>
 </ng-template>

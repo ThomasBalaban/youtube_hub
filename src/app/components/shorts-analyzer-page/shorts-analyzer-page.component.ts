@@ -188,7 +188,6 @@ export class ShortsAnalyzerPageComponent extends PollingComponent {
   serviceStatus  = signal<ServiceStatus | null>(null);
   launcherOnline = signal(false);
   apiOnline      = signal(false);
-  actionPending  = signal(false);
   logs           = signal<string[]>([]);
   lastUpdated    = signal('—');
 
@@ -232,7 +231,6 @@ export class ShortsAnalyzerPageComponent extends PollingComponent {
   showFullRerunModal = signal(false);   // "rerun analysis for every video" is expensive
 
   // ── Computed ───────────────────────────────────────────────────────────────
-  isRunning  = computed(() => this.serviceStatus()?.status === 'online');
   isStarting = computed(() => this.serviceStatus()?.status === 'starting');
   jobRunning = computed(() => !!this.jobStatus()?.running);
 
@@ -400,17 +398,6 @@ export class ShortsAnalyzerPageComponent extends PollingComponent {
 
   private _prevRunning = false;
   private _autoOpened  = false;
-
-  // ── Service control ────────────────────────────────────────────────────────
-  async serviceAction(act: 'start' | 'stop' | 'restart') {
-    if (this.actionPending()) return;
-    this.actionPending.set(true);
-    try {
-      await fetch(`/launcher/services/shorts_analyzer_api/${act}`, { method: 'POST' });
-      await this.poll();
-      if (act !== 'stop') setTimeout(() => this.poll(), 3000);
-    } finally { this.actionPending.set(false); }
-  }
 
   // ── Files list ─────────────────────────────────────────────────────────────
   async refreshFiles() {

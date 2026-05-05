@@ -12,8 +12,7 @@
     </div>
     <div class="header-right">
       <div class="status-strip" [style.--sc]="serviceStatusMeta().color">
-        @if (actionPending()) { <span class="strip-spinner"></span> }
-        @else { <span>{{ serviceStatusMeta().icon }}</span> }
+        <span>{{ serviceStatusMeta().icon }}</span>
         <span>{{ serviceStatusMeta().label }}</span>
         @if (serviceStatus()?.pid) { <span class="strip-pid">PID {{ serviceStatus()!.pid }}</span> }
       </div>
@@ -22,13 +21,6 @@
         <span>{{ analyzerMeta().icon }}</span>
         <span>{{ analyzerMeta().label }}</span>
       </div>
-      @if (serviceStatus()?.status === 'offline' || serviceStatus()?.status === 'unknown') {
-        <button class="btn btn-start-api" [disabled]="actionPending() || !launcherOnline()"
-                (click)="serviceAction('start')">▶ Start API</button>
-      } @else if (serviceStatus()?.status === 'online') {
-        <button class="btn btn-stop-api" [disabled]="actionPending() || isProcessing()"
-                (click)="serviceAction('stop')">■ Stop API</button>
-      }
       <span class="last-upd">{{ lastUpdated() }}</span>
     </div>
   </div>
@@ -36,7 +28,7 @@
   @if (!launcherOnline()) {
     <div class="banner-warn">⚠ Launcher offline — start it with <code>npm start</code></div>
   } @else if (!apiOnline()) {
-    <div class="banner-info">💡 Start the SimpleAutoSubs API using the button above to queue files and process them.</div>
+    <div class="banner-info">💡 SimpleAutoSubs API is offline. Use <strong>Start APIs</strong> in the top ribbon to bring it online.</div>
   }
 
   <div class="page-panels">

@@ -94,7 +94,6 @@ export class SubtitlerPageComponent extends PollingComponent {
   saving         = signal(false);
   saveDone       = signal(false);
   saveError      = signal('');
-  actionPending  = signal(false);
   settingsLoaded = signal(false);
 
   // ── Log viewer state ───────────────────────────────────────────────────────
@@ -365,17 +364,7 @@ export class SubtitlerPageComponent extends PollingComponent {
     }
   }
 
-  // ── Service & processing control ───────────────────────────────────────────
-  async serviceAction(act: 'start' | 'stop' | 'restart') {
-    if (this.actionPending()) return;
-    this.actionPending.set(true);
-    try {
-      await fetch(`/launcher/services/simple_auto_subs_api/${act}`, { method: 'POST' });
-      await this.poll();
-      if (act !== 'stop') setTimeout(() => this.poll(), 3000);
-    } finally { this.actionPending.set(false); }
-  }
-
+  // ── Processing control ─────────────────────────────────────────────────────
   async startProcessing() {
     await fetch('/subtitler/process/start', { method: 'POST' }).catch(() => {});
     await this.poll();

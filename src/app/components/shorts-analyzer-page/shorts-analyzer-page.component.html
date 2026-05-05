@@ -21,33 +21,12 @@
   @if (!launcherOnline()) {
     <div class="banner-warn">⚠ Launcher offline — start it with <code>npm start</code></div>
   } @else if (!apiOnline() && !isStarting()) {
-    <div class="banner-info">Shorts Analyzer API is offline. Click <strong>▶ Start API</strong> to bring it online.</div>
+    <div class="banner-info">Shorts Analyzer API is offline. Use <strong>Start APIs</strong> in the top ribbon.</div>
   }
 
   <div class="page-panels">
 
     <div class="left-panel">
-
-      <!-- Service control -->
-      <section class="section controls-section">
-        <div class="ctrl-row">
-          <button class="btn btn-run"
-                  [disabled]="!launcherOnline() || isRunning() || isStarting() || actionPending()"
-                  (click)="serviceAction('start')">
-            ▶ Start API
-          </button>
-          <button class="btn btn-stop"
-                  [disabled]="!launcherOnline() || (!isRunning() && !isStarting()) || actionPending()"
-                  (click)="serviceAction('stop')">
-            ■ Stop
-          </button>
-          <button class="btn btn-run"
-                  [disabled]="!launcherOnline() || actionPending()"
-                  (click)="serviceAction('restart')">
-            ↻ Restart
-          </button>
-        </div>
-      </section>
 
       <!-- Start new analysis (Phases 1+2) -->
       <section class="section">

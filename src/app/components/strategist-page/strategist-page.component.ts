@@ -6,14 +6,6 @@ import { PollingComponent } from '../../shared/polling.component';
 
 interface ServiceStatus { id: string; status: string; pid: number | null; }
 
-interface HealthResponse {
-  status: string;
-  port: number;
-  analyzer_reachable: boolean;
-  data_dir: string;
-  traces_dir: string;
-}
-
 interface CutRow {
   cut_id: string;
   video_id: string | null;
@@ -80,7 +72,7 @@ interface RecommendationItem {
   trace_id: string | null;
 }
 
-type Tab = 'thinker' | 'cuts' | 'experiments' | 'traces';
+type Tab = 'recommendations' | 'cuts' | 'experiments' | 'traces';
 type RecCategory = 'postmortems' | 'tailwind_critiques' | 'titles' | 'channel' | 'capabilities' | 'edits';
 
 @Component({
@@ -97,13 +89,61 @@ export class StrategistPageComponent extends PollingComponent {
   serviceStatus  = signal<ServiceStatus | null>(null);
   launcherOnline = signal(false);
   apiOnline      = signal(false);
-  actionPending  = signal(false);
-  health         = signal<HealthResponse | null>(null);
   lastUpdated    = signal('—');
   logs           = signal<string[]>([]);
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
-  activeTab = signal<Tab>('thinker');
+  activeTab = signal<Tab>('recommendations');
+
+  // ── Layout: draggable left/right pane divider ─────────────────────────────
+  private readonly _LS_LEFT_WIDTH = 'strategist-left-width';
+  leftPaneWidth = signal<number>(this._restoreLeftWidth());
+  resizing      = signal(false);
+
+  private _restoreLeftWidth(): number {
+    try {
+      const v = Number(localStorage.getItem('strategist-left-width'));
+      if (Number.isFinite(v) && v >= 280 && v <= 1400) return v;
+    } catch { /* ignore */ }
+    return 480;
+  }
+
+  private _resizeMove?: (e: MouseEvent) => void;
+  private _resizeUp?: () => void;
+
+  startResize(ev: MouseEvent) {
+    ev.preventDefault();
+    const startX = ev.clientX;
+    const startWidth = this.leftPaneWidth();
+    this.resizing.set(true);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    this._resizeMove = (e: MouseEvent) => {
+      const max = Math.max(320, window.innerWidth - 360);
+      const next = Math.max(280, Math.min(max, startWidth + (e.clientX - startX)));
+      this.leftPaneWidth.set(next);
+    };
+    this._resizeUp = () => {
+      if (this._resizeMove) document.removeEventListener('mousemove', this._resizeMove);
+      if (this._resizeUp)   document.removeEventListener('mouseup',   this._resizeUp);
+      this._resizeMove = undefined;
+      this._resizeUp = undefined;
+      this.resizing.set(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      try { localStorage.setItem(this._LS_LEFT_WIDTH, String(this.leftPaneWidth())); } catch { /* ignore */ }
+    };
+
+    document.addEventListener('mousemove', this._resizeMove);
+    document.addEventListener('mouseup',   this._resizeUp);
+  }
+
+  override ngOnDestroy() {
+    super.ngOnDestroy();
+    if (this._resizeMove) document.removeEventListener('mousemove', this._resizeMove);
+    if (this._resizeUp)   document.removeEventListener('mouseup',   this._resizeUp);
+  }
 
   // ── Thinker ───────────────────────────────────────────────────────────────
   thinker          = signal<ThinkerStatus | null>(null);
@@ -141,19 +181,7 @@ export class StrategistPageComponent extends PollingComponent {
   selectedTraceId = signal<string | null>(null);
   traceLoading   = signal(false);
 
-  // Status of the not-yet-implemented `/think/*` endpoints. The strategist
-  // returns 501 for these; surfacing that to the operator beats silent failures.
-  endpointStatus = signal<Record<string, 'unknown' | 'ok' | 'not_implemented' | 'error'>>({
-    '/think/title':       'unknown',
-    '/think/cut-plan':    'unknown',
-    '/think/effects':     'unknown',
-    '/strategy/patterns': 'unknown',
-    '/experiment/design': 'unknown',
-    '/roadmap/gaps':      'unknown',
-  });
-
   // ── Computed ──────────────────────────────────────────────────────────────
-  isRunning  = computed(() => this.serviceStatus()?.status === 'online');
   isStarting = computed(() => this.serviceStatus()?.status === 'starting');
 
   statusMeta = computed(() => {
@@ -168,10 +196,6 @@ export class StrategistPageComponent extends PollingComponent {
     };
     return map[s] ?? map['unknown'];
   });
-
-  endpointEntries = computed(() =>
-    Object.entries(this.endpointStatus()).map(([path, status]) => ({ path, status })),
-  );
 
   // ── Polling ───────────────────────────────────────────────────────────────
   override async poll() {
@@ -193,14 +217,9 @@ export class StrategistPageComponent extends PollingComponent {
     }
 
     if (this.apiOnline()) {
-      const [h, l] = await Promise.allSettled([
-        fetch('/shorts-strategist/health'),
-        fetch('/shorts-strategist/logs?last=300'),
-      ]);
-      if (h.status === 'fulfilled' && h.value.ok)
-        this.health.set(await h.value.json() as HealthResponse);
-      if (l.status === 'fulfilled' && l.value.ok) {
-        const d = await l.value.json();
+      const l = await fetch('/shorts-strategist/logs?last=300').catch(() => null);
+      if (l?.ok) {
+        const d = await l.json();
         this.logs.set(d.lines ?? []);
       }
 
@@ -208,7 +227,7 @@ export class StrategistPageComponent extends PollingComponent {
       await this.loadThinker();
 
       // Auto-load whichever tab is open
-      if (this.activeTab() === 'thinker') {
+      if (this.activeTab() === 'recommendations') {
         await this.loadRecommendations(true);
       } else if (this.activeTab() === 'cuts' && !this.cutsLoading()) {
         await this.loadCuts();
@@ -217,64 +236,9 @@ export class StrategistPageComponent extends PollingComponent {
       } else if (this.activeTab() === 'traces') {
         await this.loadTraces();
       }
-
-      // Probe stub endpoints once per poll so the UI reflects which are live.
-      // Use HEAD-equivalent GETs where possible; the endpoints all return 501
-      // until implemented, so a single status code tells us everything.
-      if (!this._endpointsProbed) {
-        this._endpointsProbed = true;
-        await this.probeEndpoints();
-      }
     }
 
     this.lastUpdated.set('Updated ' + new Date().toLocaleTimeString());
-  }
-
-  private _endpointsProbed = false;
-
-  // ── Service control ───────────────────────────────────────────────────────
-  async serviceAction(act: 'start' | 'stop' | 'restart') {
-    if (this.actionPending()) return;
-    this.actionPending.set(true);
-    try {
-      await fetch(`/launcher/services/shorts_strategist_api/${act}`, { method: 'POST' });
-      this._endpointsProbed = false;
-      await this.poll();
-      if (act !== 'stop') setTimeout(() => this.poll(), 3000);
-    } finally { this.actionPending.set(false); }
-  }
-
-  // ── Endpoint probing ──────────────────────────────────────────────────────
-  // Send minimal POSTs with empty bodies to detect 501 vs 200/422 (implemented).
-  // FastAPI returns 422 for validation errors, which still proves the route is
-  // wired up — so 422 means "implemented, just needs real input."
-  async probeEndpoints() {
-    const probes: Array<[string, 'GET' | 'POST']> = [
-      ['/think/title',       'POST'],
-      ['/think/cut-plan',    'POST'],
-      ['/think/effects',     'POST'],
-      ['/strategy/patterns', 'GET'],
-      ['/experiment/design', 'POST'],
-      ['/roadmap/gaps',      'POST'],
-    ];
-    const next = { ...this.endpointStatus() };
-    await Promise.all(probes.map(async ([path, method]) => {
-      try {
-        const url = method === 'GET'
-          ? `/shorts-strategist${path}?channel_handle=__probe__`
-          : `/shorts-strategist${path}`;
-        const init: RequestInit = method === 'POST'
-          ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }
-          : { method: 'GET' };
-        const res = await fetch(url, init);
-        if (res.status === 501) next[path] = 'not_implemented';
-        else if (res.status === 422 || res.ok) next[path] = 'ok';
-        else next[path] = 'error';
-      } catch {
-        next[path] = 'error';
-      }
-    }));
-    this.endpointStatus.set(next);
   }
 
   // ── Thinker ───────────────────────────────────────────────────────────────
@@ -531,7 +495,7 @@ export class StrategistPageComponent extends PollingComponent {
   setTab(t: Tab) {
     this.activeTab.set(t);
     if (this.apiOnline()) {
-      if (t === 'thinker') this.loadRecommendations();
+      if (t === 'recommendations') this.loadRecommendations();
       else if (t === 'cuts') this.loadCuts();
       else if (t === 'experiments') this.loadExperiments();
       else if (t === 'traces') this.loadTraces();
@@ -571,21 +535,4 @@ export class StrategistPageComponent extends PollingComponent {
     return v.toFixed(2);
   }
 
-  endpointBadgeClass(status: string): string {
-    return ({
-      ok:               'ep-ok',
-      not_implemented:  'ep-stub',
-      error:            'ep-err',
-      unknown:          'ep-unknown',
-    } as Record<string, string>)[status] ?? 'ep-unknown';
-  }
-
-  endpointBadgeLabel(status: string): string {
-    return ({
-      ok:               'live',
-      not_implemented:  'stub',
-      error:            'error',
-      unknown:          '—',
-    } as Record<string, string>)[status] ?? '—';
-  }
 }
