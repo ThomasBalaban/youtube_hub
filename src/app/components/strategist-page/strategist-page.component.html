@@ -2,19 +2,10 @@
   <div class="page-header">
     <div class="header-left">
       <a routerLink="/" class="back-btn"><span>←</span><span>Hub</span></a>
-      <div class="title-block">
-        <h1 class="page-title"><span class="icon" style="color: #fb923c;">🧠</span> Shorts Strategist</h1>
-        <span class="sub-label">Deep-think reasoning: titles, cut plans, effects, strategy memory</span>
-      </div>
+      <h1 class="page-title"><span class="icon" style="color: #fb923c;">🧠</span> Shorts Strategist</h1>
     </div>
     <div class="header-right">
-      <div class="status-strip" [style.--sc]="statusMeta().color">
-        @if (isStarting()) { <span class="strip-spinner"></span> }
-        @else { <span>{{ statusMeta().icon }}</span> }
-        <span>{{ statusMeta().label }}</span>
-        @if (serviceStatus()?.pid) { <span class="strip-pid">PID {{ serviceStatus()!.pid }}</span> }
-      </div>
-      <span class="last-upd">{{ lastUpdated() }}</span>
+      <span class="sub-label">Deep-think reasoning: titles, cut plans, effects, strategy memory</span>
     </div>
   </div>
 

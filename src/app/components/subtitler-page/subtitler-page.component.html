@@ -5,23 +5,10 @@
       <a routerLink="/" class="back-btn" title="Back to Hub">
         <span>←</span><span>Hub</span>
       </a>
-      <div class="title-block">
-        <h1 class="page-title"><span class="sub-icon">💬</span> SimpleAutoSubs</h1>
-        <span class="sub-label">Queue videos, adjust settings, and process without the GUI</span>
-      </div>
+      <h1 class="page-title"><span class="sub-icon">💬</span> SimpleAutoSubs</h1>
     </div>
     <div class="header-right">
-      <div class="status-strip" [style.--sc]="serviceStatusMeta().color">
-        <span>{{ serviceStatusMeta().icon }}</span>
-        <span>{{ serviceStatusMeta().label }}</span>
-        @if (serviceStatus()?.pid) { <span class="strip-pid">PID {{ serviceStatus()!.pid }}</span> }
-      </div>
-      <div class="status-strip" [style.--sc]="analyzerMeta().color"
-           [title]="analyzerStatus()?.base_url ?? 'shorts_analyzer bridge'">
-        <span>{{ analyzerMeta().icon }}</span>
-        <span>{{ analyzerMeta().label }}</span>
-      </div>
-      <span class="last-upd">{{ lastUpdated() }}</span>
+      <span class="sub-label">Queue videos, adjust settings, and process without the GUI</span>
     </div>
   </div>
 

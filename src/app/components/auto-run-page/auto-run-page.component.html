@@ -4,21 +4,10 @@
   <div class="page-header">
     <div class="header-left">
       <a routerLink="/" class="back-btn"><span>←</span><span>Hub</span></a>
-      <div class="title-block">
-        <h1 class="page-title"><span class="ar-icon">⚡</span> Auto-Run</h1>
-        <span class="sub-label">Automated Backtrack scan → SimpleAutoSubs → Upload → Publish pipeline</span>
-      </div>
+      <h1 class="page-title"><span class="ar-icon">⚡</span> Auto-Run</h1>
     </div>
     <div class="header-right">
-      <div class="status-strip" [style.--sc]="isRunning() ? '#fbbf24' : '#4b5563'">
-        @if (isRunning()) { <span class="strip-spinner"></span> }
-        @else { <span>○</span> }
-        <span>{{ isRunning() ? stepMeta().label : 'Idle' }}</span>
-        @if (status()?.history_count) {
-          <span class="strip-pid">{{ status()!.history_count }} processed all-time</span>
-        }
-      </div>
-      <span class="last-upd">{{ lastUpdated() }}</span>
+      <span class="sub-label">Automated Backtrack scan → SimpleAutoSubs → Upload → Publish pipeline</span>
     </div>
   </div>
 

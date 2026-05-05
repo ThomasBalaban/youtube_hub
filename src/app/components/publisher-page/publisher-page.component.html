@@ -5,19 +5,10 @@
       <a routerLink="/" class="back-btn">
         <span>←</span><span>Hub</span>
       </a>
-      <div class="title-block">
-        <h1 class="page-title"><span class="yt-icon">▶</span> YouTube Shorts Publisher</h1>
-        <span class="sub-label">Configure run mode &amp; launch</span>
-      </div>
+      <h1 class="page-title"><span class="yt-icon">▶</span> YouTube Shorts Publisher</h1>
     </div>
     <div class="header-right">
-      <div class="status-strip" [style.--sc]="statusMeta().color">
-        @if (isStarting() || isStopping()) { <span class="strip-spinner"></span> }
-        @else { <span>{{ statusMeta().icon }}</span> }
-        <span>{{ statusMeta().label }}</span>
-        @if (serviceStatus()?.pid) { <span class="strip-pid">PID {{ serviceStatus()!.pid }}</span> }
-      </div>
-      <span class="last-upd">{{ lastUpdated() }}</span>
+      <span class="sub-label">Configure run mode &amp; launch</span>
     </div>
   </div>
 
