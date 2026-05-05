@@ -209,7 +209,7 @@ export class StrategistPageComponent extends PollingComponent {
 
       // Auto-load whichever tab is open
       if (this.activeTab() === 'thinker') {
-        await this.loadRecommendations();
+        await this.loadRecommendations(true);
       } else if (this.activeTab() === 'cuts' && !this.cutsLoading()) {
         await this.loadCuts();
       } else if (this.activeTab() === 'experiments' && !this.experimentsLoading()) {
@@ -339,19 +339,19 @@ export class StrategistPageComponent extends PollingComponent {
     }
   }
 
-  async loadRecommendations() {
+  async loadRecommendations(isRefresh = false) {
     if (!this.apiOnline()) return;
-    this.recLoading.set(true);
+    if (!isRefresh) this.recLoading.set(true);
     try {
       const res = await fetch(`/shorts-strategist/recommendations/${this.recCategory()}`);
       if (res.ok) {
         const d = await res.json();
         this.recItems.set((d.items ?? []) as RecommendationItem[]);
-      } else {
+      } else if (!isRefresh) {
         this.recItems.set([]);
       }
     } finally {
-      this.recLoading.set(false);
+      if (!isRefresh) this.recLoading.set(false);
     }
   }
 
