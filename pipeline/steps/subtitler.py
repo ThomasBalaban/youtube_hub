@@ -8,10 +8,10 @@ SUBTITLER_BASE = "http://127.0.0.1:9020"
 
 async def run_subtitler(client: httpx.AsyncClient, files: list) -> bool:
     log("─" * 40)
-    log("STEP 2 — SimpleAutoSubs Processing")
+    log("STEP 2 — shorts-auto-editor Processing")
     log("─" * 40)
     state["step"]       = "processing"
-    state["step_label"] = f"Processing {len(files)} file(s) through SimpleAutoSubs..."
+    state["step_label"] = f"Processing {len(files)} file(s) through shorts-auto-editor..."
 
     paths = [f[1] for f in files]
     launcher_base = get_launcher_base()
@@ -25,12 +25,12 @@ async def run_subtitler(client: httpx.AsyncClient, files: list) -> bool:
         svc_r = await client.get(f"{launcher_base}/launcher/services")
         if svc_r.is_success:
             svcs    = svc_r.json()
-            api_svc = next((s for s in svcs if s["id"] == "simple_auto_subs_api"), None)
+            api_svc = next((s for s in svcs if s["id"] == "shorts_auto_editor_api"), None)
 
             if not api_svc or api_svc["status"] != "online":
-                log("▶ Starting SimpleAutoSubs API (heavy imports — allow up to 3 min)...")
+                log("▶ Starting shorts-auto-editor API (heavy imports — allow up to 3 min)...")
                 await client.post(
-                    f"{launcher_base}/launcher/services/simple_auto_subs_api/start"
+                    f"{launcher_base}/launcher/services/shorts_auto_editor_api/start"
                 )
                 api_ready = False
                 for attempt in range(36):
@@ -38,18 +38,18 @@ async def run_subtitler(client: httpx.AsyncClient, files: list) -> bool:
                     r2 = await client.get(f"{launcher_base}/launcher/services")
                     if r2.is_success:
                         svcs2  = r2.json()
-                        api2   = next((s for s in svcs2 if s["id"] == "simple_auto_subs_api"), None)
+                        api2   = next((s for s in svcs2 if s["id"] == "shorts_auto_editor_api"), None)
                         status2 = api2["status"] if api2 else "unknown"
                         log(f"   ⏳ Waiting for API... ({status2}) [{attempt + 1}/36]")
                         if api2 and status2 == "online":
-                            log("✅ SimpleAutoSubs API is online")
+                            log("✅ shorts-auto-editor API is online")
                             api_ready = True
                             break
                 if not api_ready:
-                    log("❌ SimpleAutoSubs API failed to start within 3 minutes")
+                    log("❌ shorts-auto-editor API failed to start within 3 minutes")
                     return False
             else:
-                log("✅ SimpleAutoSubs API already online")
+                log("✅ shorts-auto-editor API already online")
 
         r = await client.post(f"{SUBTITLER_BASE}/files", json={"paths": paths})
         if not r.is_success:
@@ -102,7 +102,7 @@ async def run_subtitler(client: httpx.AsyncClient, files: list) -> bool:
 
             if err_count > errors_seen:
                 state["errors"].append(
-                    f"{err_count - errors_seen} file(s) errored in SimpleAutoSubs"
+                    f"{err_count - errors_seen} file(s) errored in shorts-auto-editor"
                 )
                 errors_seen = err_count
 

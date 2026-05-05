@@ -79,7 +79,7 @@ export class AutoRunPageComponent extends PollingComponent {
 
   steps = [
     { id: 'scanning',   label: 'Backtrack Scan',    icon: '🔍' },
-    { id: 'processing', label: 'SimpleAutoSubs',     icon: '💬' },
+    { id: 'processing', label: 'shorts-auto-editor',     icon: '💬' },
     { id: 'uploading',  label: 'YouTube Uploader',   icon: '▶'  },
     { id: 'checking',   label: 'Check & Cleanup',    icon: '🗑'  },
     { id: 'scraping',   label: 'Scraper',            icon: '🕷'  },

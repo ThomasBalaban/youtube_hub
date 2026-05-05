@@ -1,6 +1,6 @@
 """
 Service definitions for Project Hub.
-Assumes this project lives as a sibling to SimpleAutoSubs and youtube_shorts_publisher.
+Assumes this project lives as a sibling to shorts-auto-editor and youtube_shorts_publisher.
 
 To add a new project, just append another entry to SERVICE_DEFS below.
 """
@@ -61,7 +61,7 @@ def conda_python(env_name: str) -> str:
 #
 #   9010  — YouTube Hub Launcher (default, direct run)
 #   9011  — YouTube Hub Launcher (external UI / start:launcher)
-#   9020  — SimpleAutoSubs API
+#   9020  — shorts-auto-editor API
 #
 # health_check options:
 #   "process" — just checks if the PID is alive (use for GUI/desktop apps)
@@ -72,11 +72,11 @@ def conda_python(env_name: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 SERVICE_DEFS: Dict[str, Dict[str, Any]] = {
-    "simple_auto_subs_api": {
-        "label":        "SimpleAutoSubs API",
-        "description":  "Headless REST API for the Hub to queue videos, change settings, and run subtitle processing without the GUI",
+    "shorts_auto_editor_api": {
+        "label":        "shorts-auto-editor API",
+        "description":  "Headless REST API for the Hub to queue videos and run the full auto-edit pipeline (AI trim, transcribe, onomatopoeia, title gen) without the GUI",
         "cmd":          [conda_python("simpleautosubs"), "-u", "api_server.py"],
-        "cwd":          os.path.join(PARENT_DIR, "SimpleAutoSubs"),
+        "cwd":          os.path.join(PARENT_DIR, "shorts-auto-editor"),
         "port":         9020,
         "health_check": "http",
         "health_url":   "http://localhost:9020/health",
@@ -123,7 +123,7 @@ SERVICE_DEFS: Dict[str, Dict[str, Any]] = {
     },
     "shorts_strategist_api": {
         "label":        "Shorts Strategist API",
-        "description":  "Deep-think reasoning service for SimpleAutoSubs: title generation, cut planning, special effects, editing-strategy memory, experiment design, and capability roadmap",
+        "description":  "Deep-think reasoning service for shorts-auto-editor: title generation, cut planning, special effects, editing-strategy memory, experiment design, and capability roadmap",
         "cmd":          [conda_python("strategy2"), "-u", "api_server.py"],
         "cwd":          os.path.join(PARENT_DIR, "shorts_strategist"),
         "port":         9022,
@@ -150,7 +150,7 @@ SERVICE_DEFS: Dict[str, Dict[str, Any]] = {
 
 # How many times to poll the health check before giving up on startup
 BOOT_RETRIES: Dict[str, int] = {
-    "simple_auto_subs_api": 12,   # Heavier imports — give it more time
+    "shorts_auto_editor_api": 12,   # Heavier imports — give it more time
     "youtube_publisher":    8,
     "shorts_analyzer_api":  12,   # Heavier imports — give it more time
     "shorts_strategist_api": 12,

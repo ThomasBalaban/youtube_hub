@@ -1,5 +1,5 @@
 // Skip proxying when the browser is navigating to a page (hard refresh on
-// /subtitler, /shorts-analyzer, etc.) so the dev server serves index.html
+// /shorts-editor, /shorts-analyzer, etc.) so the dev server serves index.html
 // and the Angular router can take over.
 const bypassPageNav = (req) => {
   const accept = req.headers.accept || '';
@@ -15,10 +15,10 @@ module.exports = {
     secure: false,
     bypass: bypassPageNav,
   },
-  '/subtitler': {
+  '/shorts-editor': {
     target: 'http://localhost:9020',
     secure: false,
-    pathRewrite: { '^/subtitler': '' },
+    pathRewrite: { '^/shorts-editor': '' },
     bypass: bypassPageNav,
   },
   '/shorts-analyzer': {

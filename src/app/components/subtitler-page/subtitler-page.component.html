@@ -5,17 +5,17 @@
       <a routerLink="/" class="back-btn" title="Back to Hub">
         <span>←</span><span>Hub</span>
       </a>
-      <h1 class="page-title"><span class="sub-icon">💬</span> SimpleAutoSubs</h1>
+      <h1 class="page-title"><span class="sub-icon">💬</span>Auto Editor</h1>
     </div>
     <div class="header-right">
-      <span class="sub-label">Queue videos, adjust settings, and process without the GUI</span>
+      <span class="sub-label">Auto-edit gaming clips: AI trim, transcribe, onomatopoeia overlays, and title generation</span>
     </div>
   </div>
 
   @if (!launcherOnline()) {
     <div class="banner-warn">⚠ Launcher offline — start it with <code>npm start</code></div>
   } @else if (!apiOnline()) {
-    <div class="banner-info">💡 SimpleAutoSubs API is offline. Use <strong>Start APIs</strong> in the top ribbon to bring it online.</div>
+    <div class="banner-info">💡 shorts-auto-editor API is offline. Use <strong>Start APIs</strong> in the top ribbon to bring it online.</div>
   }
 
   <div class="page-panels">

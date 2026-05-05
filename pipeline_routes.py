@@ -1,6 +1,6 @@
 """
 FastAPI router for the Auto-Run pipeline.
-Orchestrates: Backtrack Scan → SimpleAutoSubs processing on a 1-hour loop.
+Orchestrates: Backtrack Scan → shorts-auto-editor processing on a 1-hour loop.
 """
 
 import asyncio
@@ -55,7 +55,7 @@ async def _ensure_http_client():
     if _http_client is None:
         import httpx
         # connect timeout is short (fail fast if nothing is listening),
-        # read timeout is None (no cap) because the SimpleAutoSubs event loop
+        # read timeout is None (no cap) because the shorts-auto-editor event loop
         # can be starved by heavy AI/transcription work for several minutes at a time.
         # The outer poll loop already enforces a 1-hour overall ceiling.
         _http_client = httpx.AsyncClient(
@@ -191,12 +191,12 @@ async def _run_scanner(client) -> bool:
 
 
 async def _run_subtitler(client, files: list) -> bool:
-    """Start SimpleAutoSubs API, queue files, start processing, wait for done."""
+    """Start shorts-auto-editor API, queue files, start processing, wait for done."""
     _log("─" * 40)
-    _log("STEP 2 — SimpleAutoSubs Processing")
+    _log("STEP 2 — shorts-auto-editor Processing")
     _log("─" * 40)
     _state["step"] = "processing"
-    _state["step_label"] = f"Processing {len(files)} file(s) through SimpleAutoSubs..."
+    _state["step_label"] = f"Processing {len(files)} file(s) through shorts-auto-editor..."
 
     paths = [f[1] for f in files]
 
@@ -209,11 +209,11 @@ async def _run_subtitler(client, files: list) -> bool:
         svc_r = await client.get(f"{LAUNCHER_BASE}/launcher/services")
         if svc_r.is_success:
             svcs = svc_r.json()
-            api_svc = next((s for s in svcs if s["id"] == "simple_auto_subs_api"), None)
+            api_svc = next((s for s in svcs if s["id"] == "shorts_auto_editor_api"), None)
             if not api_svc or api_svc["status"] != "online":
-                _log("▶ Starting SimpleAutoSubs API (heavy imports, allow up to 3 min)...")
+                _log("▶ Starting shorts-auto-editor API (heavy imports, allow up to 3 min)...")
                 await client.post(
-                    f"{LAUNCHER_BASE}/launcher/services/simple_auto_subs_api/start"
+                    f"{LAUNCHER_BASE}/launcher/services/shorts_auto_editor_api/start"
                 )
                 # Poll the launcher every 5s for up to 3 minutes.
                 # The launcher itself handles the health check — we just wait for "online".
@@ -223,18 +223,18 @@ async def _run_subtitler(client, files: list) -> bool:
                     r2 = await client.get(f"{LAUNCHER_BASE}/launcher/services")
                     if r2.is_success:
                         svcs2 = r2.json()
-                        api2 = next((s for s in svcs2 if s["id"] == "simple_auto_subs_api"), None)
+                        api2 = next((s for s in svcs2 if s["id"] == "shorts_auto_editor_api"), None)
                         status2 = api2["status"] if api2 else "unknown"
                         _log(f"   ⏳ Waiting for API... ({status2}) [{attempt+1}/36]")
                         if api2 and status2 == "online":
-                            _log("✅ SimpleAutoSubs API is online")
+                            _log("✅ shorts-auto-editor API is online")
                             api_ready = True
                             break
                 if not api_ready:
-                    _log("❌ SimpleAutoSubs API failed to start within 3 minutes")
+                    _log("❌ shorts-auto-editor API failed to start within 3 minutes")
                     return False
             else:
-                _log("✅ SimpleAutoSubs API already online")
+                _log("✅ shorts-auto-editor API already online")
 
         # Queue the files
         r = await client.post(
@@ -264,7 +264,7 @@ async def _run_subtitler(client, files: list) -> bool:
         for _ in range(720):
             await asyncio.sleep(5)
 
-            # ── Forward new SimpleAutoSubs log lines into the pipeline log ──
+            # ── Forward new shorts-auto-editor log lines into the pipeline log ──
             try:
                 log_r = await client.get(f"{SUBTITLER_BASE}/logs?last=500", timeout=3.0)
                 if log_r.is_success:
@@ -296,7 +296,7 @@ async def _run_subtitler(client, files: list) -> bool:
             err_count = status.get("errors", 0)
 
             if err_count > errors_seen:
-                _state["errors"].append(f"{err_count - errors_seen} file(s) errored in SimpleAutoSubs")
+                _state["errors"].append(f"{err_count - errors_seen} file(s) errored in shorts-auto-editor")
                 errors_seen = err_count
 
             if not processing and queued_left == 0:
@@ -353,7 +353,7 @@ async def _pipeline_loop() -> None:
                 files_processed = len(new_files)
                 _log(f"📝 Saved {files_processed} file(s) to pipeline history")
             else:
-                _state["errors"].append("SimpleAutoSubs processing failed — see log")
+                _state["errors"].append("shorts-auto-editor processing failed — see log")
 
         # Record the run
         _runs.insert(0, {

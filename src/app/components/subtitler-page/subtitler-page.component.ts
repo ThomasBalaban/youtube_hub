@@ -192,7 +192,7 @@ export class SubtitlerPageComponent extends PollingComponent {
       if (res.ok) {
         this.launcherOnline.set(true);
         const svcs: ServiceStatus[] = await res.json();
-        const svc = svcs.find(s => s.id === 'simple_auto_subs_api') ?? null;
+        const svc = svcs.find(s => s.id === 'shorts_auto_editor_api') ?? null;
         this.serviceStatus.set(svc);
         this.apiOnline.set(svc?.status === 'online');
         const strat = svcs.find(s => s.id === 'shorts_strategist_api');
@@ -225,10 +225,10 @@ export class SubtitlerPageComponent extends PollingComponent {
 
     if (this.apiOnline()) {
       const [statusRes, filesRes, logsRes, analyzerRes] = await Promise.allSettled([
-        fetch('/subtitler/process/status'),
-        fetch('/subtitler/files'),
-        fetch('/subtitler/logs?last=200'),
-        fetch('/subtitler/analyzer/status'),
+        fetch('/shorts-editor/process/status'),
+        fetch('/shorts-editor/files'),
+        fetch('/shorts-editor/logs?last=200'),
+        fetch('/shorts-editor/analyzer/status'),
       ]);
       if (statusRes.status === 'fulfilled' && statusRes.value.ok)
         this.processStatus.set(await statusRes.value.json());
@@ -256,7 +256,7 @@ export class SubtitlerPageComponent extends PollingComponent {
   async refreshLogFiles() {
     const dir = this.settings().output_dir;
     if (!dir || !this.apiOnline()) { this.logFiles.set([]); return; }
-    const res = await fetch(`/subtitler/session-logs/list?dir=${encodeURIComponent(dir)}`).catch(() => null);
+    const res = await fetch(`/shorts-editor/session-logs/list?dir=${encodeURIComponent(dir)}`).catch(() => null);
     if (res?.ok) {
       const d = await res.json();
       this.logFiles.set(d.files ?? []);
@@ -267,7 +267,7 @@ export class SubtitlerPageComponent extends PollingComponent {
     this.logFileLoading.set(true);
     this.selectedLogFile.set(file);
     this.logViewState.set('file');
-    const res = await fetch(`/subtitler/session-logs/read?path=${encodeURIComponent(file.path)}`).catch(() => null);
+    const res = await fetch(`/shorts-editor/session-logs/read?path=${encodeURIComponent(file.path)}`).catch(() => null);
     if (res?.ok) {
       const d = await res.json();
       this.selectedLogContent.set(d.content ?? '');
@@ -287,11 +287,11 @@ export class SubtitlerPageComponent extends PollingComponent {
   // ── File actions ───────────────────────────────────────────────────────────
   async browseFiles() {
     try {
-      const res = await fetch('/subtitler/files/browse');
+      const res = await fetch('/shorts-editor/files/browse');
       if (!res.ok) return;
       const { paths } = await res.json();
       if (!paths?.length) return;
-      await fetch('/subtitler/files', {
+      await fetch('/shorts-editor/files', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paths }),
       });
@@ -301,29 +301,29 @@ export class SubtitlerPageComponent extends PollingComponent {
 
   async removeFile(index: number, event: MouseEvent) {
     event.stopPropagation();
-    await fetch(`/subtitler/files/${index}`, { method: 'DELETE' }).catch(() => {});
+    await fetch(`/shorts-editor/files/${index}`, { method: 'DELETE' }).catch(() => {});
     await this._refreshFiles();
   }
 
   async clearFiles() {
-    await fetch('/subtitler/files', { method: 'DELETE' }).catch(() => {});
+    await fetch('/shorts-editor/files', { method: 'DELETE' }).catch(() => {});
     await this._refreshFiles();
   }
 
   async resetFiles() {
-    await fetch('/subtitler/files/reset', { method: 'POST' }).catch(() => {});
+    await fetch('/shorts-editor/files/reset', { method: 'POST' }).catch(() => {});
     await this._refreshFiles();
   }
 
   private async _refreshFiles() {
-    const res = await fetch('/subtitler/files').catch(() => null);
+    const res = await fetch('/shorts-editor/files').catch(() => null);
     if (res?.ok) this.files.set(await res.json());
   }
 
   // ── Settings ───────────────────────────────────────────────────────────────
   async browseOutputDir() {
     try {
-      const res = await fetch('/subtitler/settings/browse-dir');
+      const res = await fetch('/shorts-editor/settings/browse-dir');
       if (!res.ok) return;
       const { path } = await res.json();
       if (path) {
@@ -347,7 +347,7 @@ export class SubtitlerPageComponent extends PollingComponent {
 
       // Also sync to running API instance if online
       if (this.apiOnline()) {
-        await fetch('/subtitler/settings', {
+        await fetch('/shorts-editor/settings', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(this.settings()),
         }).catch(() => {});
@@ -366,17 +366,17 @@ export class SubtitlerPageComponent extends PollingComponent {
 
   // ── Processing control ─────────────────────────────────────────────────────
   async startProcessing() {
-    await fetch('/subtitler/process/start', { method: 'POST' }).catch(() => {});
+    await fetch('/shorts-editor/process/start', { method: 'POST' }).catch(() => {});
     await this.poll();
   }
 
   async stopProcessing() {
-    await fetch('/subtitler/process/stop', { method: 'POST' }).catch(() => {});
+    await fetch('/shorts-editor/process/stop', { method: 'POST' }).catch(() => {});
     await this.poll();
   }
 
   async clearLogs() {
-    await fetch('/subtitler/logs', { method: 'DELETE' }).catch(() => {});
+    await fetch('/shorts-editor/logs', { method: 'DELETE' }).catch(() => {});
     this.logs.set([]);
   }
 }

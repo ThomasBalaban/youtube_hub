@@ -11,7 +11,7 @@ export const routes: Routes = [
   { path: 'auto-run',         component: AutoRunPageComponent },
   { path: 'backtrack',        component: BacktrackPageComponent },
   { path: 'publisher',        component: PublisherPageComponent },
-  { path: 'subtitler',        component: SubtitlerPageComponent },
+  { path: 'shorts-editor',    component: SubtitlerPageComponent },
   { path: 'shorts-analyzer',  component: ShortsAnalyzerPageComponent },
   { path: 'strategist',       component: StrategistPageComponent },
   { path: '**',               component: HubPageComponent },

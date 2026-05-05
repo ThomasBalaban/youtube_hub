@@ -34,12 +34,12 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         <span class="nav-label">Scan</span>
       </a>
 
-      <a routerLink="/subtitler"
+      <a routerLink="/shorts-editor"
          routerLinkActive="active"
          class="nav-item"
-         title="SimpleAutoSubs">
+         title="Shorts Auto Editor">
         <span class="nav-icon">💬</span>
-        <span class="nav-label">Subs</span>
+        <span class="nav-label">Editor</span>
       </a>
 
       <a routerLink="/publisher"

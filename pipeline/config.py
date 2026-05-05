@@ -7,7 +7,7 @@ always reflected in HTTP calls.
 
 Port assignments (all in 9000s range):
   9011  — YouTube Hub Launcher (default for standalone AND director-ui managed)
-  9020  — SimpleAutoSubs API
+  9020  — shorts-auto-editor API
 """
 
 import os

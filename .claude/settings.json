@@ -3,7 +3,9 @@
     "allow": [
       "Bash(npx tsc *)",
       "Bash(npx --no-install tsc -p tsconfig.json --noEmit)",
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "Bash(conda env *)",
+      "Read(//Users/thomasbalaban/miniconda3/envs/**)"
     ]
   }
 }

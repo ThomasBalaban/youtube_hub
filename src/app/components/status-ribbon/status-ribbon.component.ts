@@ -18,7 +18,7 @@ interface ThinkerStatus {
   current_task: { task_type: string; key: string } | null;
 }
 
-const REQUIRED_API_IDS = ['simple_auto_subs_api', 'shorts_analyzer_api', 'shorts_strategist_api'];
+const REQUIRED_API_IDS = ['shorts_auto_editor_api', 'shorts_analyzer_api', 'shorts_strategist_api'];
 
 @Component({
   selector: 'app-status-ribbon',

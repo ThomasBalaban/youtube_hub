@@ -260,7 +260,7 @@
         <div class="empty-msg">
           No cuts recorded yet.
           <p class="empty-hint">
-            Cuts appear here once SimpleAutoSubs starts posting to
+            Cuts appear here once shorts-auto-editor starts posting to
             <code>/strategy/ingest</code> with a <code>cut_id</code>. Per the
             gameplan, <code>cut_id</code> plumbing through the subtitler and
             publisher is the prerequisite for this table to be non-empty.
@@ -936,10 +936,10 @@
 
 <ng-template #editReviewTpl let-p="p">
   <div class="er-pane">
-    <!-- Advisory mode: simpleautosubs hasn't shipped editorial_decisions yet -->
+    <!-- Advisory mode: shorts-auto-editor hasn't shipped editorial_decisions yet -->
     @if (p?.advisory_only) {
     <section class="er-advisory-banner">
-      <div class="er-advisory-title">Awaiting editorial data from SimpleAutoSubs</div>
+      <div class="er-advisory-title">Awaiting editorial data from shorts-auto-editor</div>
       <p class="er-advisory-text">{{ p?.advisory_summary }}</p>
     </section>
     @if (p?.checklist?.length) {
@@ -1038,7 +1038,7 @@
     <!-- Edit directives (only if needs_edits) -->
     @if (p?.verdict === 'needs_edits' && p?.edit_directives; as ed) {
     <section class="sc-card er-directives">
-      <h3 class="sc-h-title">Edit directives <span class="sc-h-sub">— for SimpleAutoSubs to apply</span></h3>
+      <h3 class="sc-h-title">Edit directives <span class="sc-h-sub">— for shorts-auto-editor to apply</span></h3>
 
       @if (ed.retrim?.should_retrim) {
       <div class="er-dir-block">

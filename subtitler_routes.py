@@ -1,6 +1,6 @@
 """
-FastAPI router for reading/writing SimpleAutoSubs settings.
-Stored in hub_settings.json inside the SimpleAutoSubs project directory.
+FastAPI router for reading/writing shorts-auto-editor settings.
+Stored in hub_settings.json inside the shorts-auto-editor project directory.
 Settings are available via the launcher even when the API server is offline.
 """
 import json

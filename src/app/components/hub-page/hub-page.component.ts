@@ -22,7 +22,7 @@ export class HubPageComponent {
       route: '/auto-run',
       icon: '⚡',
       title: 'Auto-Run',
-      description: 'One-click pipeline: scans the SMB drive for new Backtrack recordings, copies them, and automatically runs them through SimpleAutoSubs. Repeats hourly while active.',
+      description: 'One-click pipeline: scans the SMB drive for new Backtrack recordings, copies them, and automatically runs them through shorts-auto-editor. Repeats hourly while active.',
       color: '#fbbf24',
     },
     {
@@ -33,9 +33,9 @@ export class HubPageComponent {
       color: '#a855f7',
     },
     {
-      route: '/subtitler',
+      route: '/shorts-editor',
       icon: '💬',
-      title: 'SimpleAutoSubs',
+      title: 'shorts-auto-editor',
       description: 'Queue gaming clips, add comic-book onomatopoeia overlays, transcribe mic & desktop audio, and generate AI-powered titles — all without opening the GUI.',
       color: '#34d399',
     },

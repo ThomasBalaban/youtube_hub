@@ -3,7 +3,7 @@ Main pipeline loop — full automation cycle:
 
   1. Scan SMB drive once.
   2. Collect ALL new files from inventory in one snapshot.
-  3. Send all files to SimpleAutoSubs and wait until every file is done.
+  3. Send all files to shorts-auto-editor and wait until every file is done.
   4. Once processing is complete (or if there was nothing to process):
        a. Upload processed videos to YouTube.
        b. Check unuploaded / cleanup local files.
@@ -71,7 +71,7 @@ async def pipeline_loop() -> None:
         if not scan_ok:
             cycle_errors.append("Scanner failed — see log for details")
 
-        # ── Step 2: Process ALL new files through SimpleAutoSubs ──────────────
+        # ── Step 2: Process ALL new files through shorts-auto-editor ──────────────
         # Snapshot new files immediately after the scanner exits, before
         # cluster-cleanup can trash duplicates and cause a second call to
         # get_new_files() to mis-mark those files as "deleted".
@@ -81,7 +81,7 @@ async def pipeline_loop() -> None:
         if not new_files:
             log("ℹ️ No new files to process this cycle")
         else:
-            log(f"─── SimpleAutoSubs ({len(new_files)} file(s)) ───")
+            log(f"─── shorts-auto-editor ({len(new_files)} file(s)) ───")
             for filename, path in new_files:
                 log(f"   • {filename}")
 
@@ -95,7 +95,7 @@ async def pipeline_loop() -> None:
                 cycle_processed = len(new_files)
                 log(f"✅ All {cycle_processed} file(s) processed and saved to history")
             else:
-                err = "SimpleAutoSubs failed — see log"
+                err = "shorts-auto-editor failed — see log"
                 cycle_errors.append(err)
                 log(f"⚠️ {err}")
                 drain_failed = True
