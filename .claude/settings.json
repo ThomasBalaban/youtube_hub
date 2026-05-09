@@ -12,10 +12,15 @@
       "Bash(mv /Users/thomasbalaban/Downloads/projects/youtube-automator/youtube_hub/src/app/components/auto-run-page \"/Users/thomasbalaban/Downloads/projects/youtube-automator/auto run/auto-run-page\")",
       "Bash(mv /Users/thomasbalaban/Downloads/projects/youtube-automator/youtube_hub/pipeline_routes.py \"/Users/thomasbalaban/Downloads/projects/youtube-automator/auto run/pipeline_routes.py\")",
       "Bash(mv /Users/thomasbalaban/Downloads/projects/youtube-automator/youtube_hub/pipeline_history.json \"/Users/thomasbalaban/Downloads/projects/youtube-automator/auto run/pipeline_history.json\")",
-      "Bash(rm -rf /Users/thomasbalaban/Downloads/projects/youtube-automator/youtube_hub/__pycache__/pipeline_routes*.pyc)"
+      "Bash(rm -rf /Users/thomasbalaban/Downloads/projects/youtube-automator/youtube_hub/__pycache__/pipeline_routes*.pyc)",
+      "Bash(python3 -c ' *)"
     ],
     "additionalDirectories": [
-      "/Users/thomasbalaban/Downloads/projects/youtube-automator/auto run"
+      "/Users/thomasbalaban/Downloads/projects/youtube-automator/auto run",
+      "/Users/thomasbalaban/Downloads/projects/youtube-automator/shorts_analyzer",
+      "/Users/thomasbalaban/Downloads/projects/youtube-automator/shorts_strategist",
+      "/Users/thomasbalaban/Downloads/projects/youtube-automator/shorts-auto-editor/utils",
+      "/Users/thomasbalaban/Downloads/projects/youtube-automator/youtube_shorts_publisher"
     ]
   }
 }
