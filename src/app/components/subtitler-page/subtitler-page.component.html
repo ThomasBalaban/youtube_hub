@@ -1,16 +1,9 @@
 <div class="page-container">
 
-  <div class="page-header">
-    <div class="header-left">
-      <a routerLink="/" class="back-btn" title="Back to Hub">
-        <span>←</span><span>Hub</span>
-      </a>
-      <h1 class="page-title"><span class="sub-icon">💬</span>Auto Editor</h1>
-    </div>
-    <div class="header-right">
-      <span class="sub-label">Auto-edit gaming clips: AI trim, transcribe, onomatopoeia overlays, and title generation</span>
-    </div>
-  </div>
+  <app-page-header
+    title="Auto Editor"
+    icon="💬"
+    subLabel="Auto-edit gaming clips: AI trim, transcribe, onomatopoeia overlays, and title generation" />
 
   @if (!launcherOnline()) {
     <div class="banner-warn">⚠ Launcher offline — start it with <code>npm start</code></div>

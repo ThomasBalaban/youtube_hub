@@ -2,6 +2,7 @@ import { Component, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { PollingComponent } from '../../shared/polling.component';
+import { PageHeaderComponent } from '../page-header/page-header.component';
 
 interface ServiceStatus { id: string; status: string; pid: number | null; }
 
@@ -18,7 +19,7 @@ interface DataFileMeta {
 @Component({
   selector: 'app-backtrack-page',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, PageHeaderComponent],
   templateUrl: './backtrack-page.component.html',
   styleUrl: './backtrack-page.component.scss',
 })

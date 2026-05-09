@@ -1,0 +1,48 @@
+:host {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Override the global .page-header (justify-content: space-between, align-items: center)
+   with a stretched two-column layout so the YouTube account chip can span the
+   full height of the stacked ribbon + title row. */
+.page-header {
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  gap: 0.75rem;
+}
+
+.header-main {
+  flex: 9 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.ribbon-host {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.header-row .sub-label {
+  margin-left: auto;
+  text-align: right;
+}
+
+.account-host {
+  flex: 1 1 0;
+  min-width: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}

@@ -1,13 +1,9 @@
 <div class="page-container">
-  <div class="page-header">
-    <div class="header-left">
-      <a routerLink="/" class="back-btn"><span>←</span><span>Hub</span></a>
-      <h1 class="page-title"><span class="icon" style="color: #fb923c;">🧠</span> Shorts Strategist</h1>
-    </div>
-    <div class="header-right">
-      <span class="sub-label">Deep-think reasoning: titles, cut plans, effects, strategy memory</span>
-    </div>
-  </div>
+  <app-page-header
+    title="Shorts Strategist"
+    icon="🧠"
+    iconColor="#fb923c"
+    subLabel="Deep-think reasoning: titles, cut plans, effects, strategy memory" />
 
   @if (!launcherOnline()) {
   <div class="banner-warn">⚠ Launcher offline — start it with <code>npm start</code></div>

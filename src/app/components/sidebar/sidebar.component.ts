@@ -1,28 +1,14 @@
-import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-
-interface AccountInfo {
-  channel_id?: string;
-  title?: string;
-  handle?: string;
-  avatar_url?: string;
-}
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive],
+  imports: [RouterLink, RouterLinkActive],
   template: `
     <nav class="sidebar">
-      <div class="sidebar-logo" [title]="account()?.title || 'YouTube Hub'">
-        @if (account()?.avatar_url) {
-          <img class="avatar" [src]="account()!.avatar_url" alt=""
-               referrerpolicy="no-referrer" />
-          <div class="account-name">{{ account()!.title }}</div>
-        } @else {
-          <div class="avatar-fallback">YH</div>
-        }
+      <div class="sidebar-logo" title="ReelOtter">
+        <div class="brand">ReelOtter</div>
       </div>
 
       <a routerLink="/"
@@ -77,17 +63,4 @@ interface AccountInfo {
   `,
   styleUrl: './sidebar.component.scss',
 })
-export class NavSidebarComponent implements OnInit {
-  account = signal<AccountInfo | null>(null);
-
-  async ngOnInit(): Promise<void> {
-    try {
-      const res = await fetch('/launcher/account/me');
-      if (!res.ok) return;
-      const data = (await res.json()) as AccountInfo;
-      this.account.set(data);
-    } catch {
-      // Launcher not running yet, or no OAuth token. Sidebar shows "YH" fallback.
-    }
-  }
-}
+export class NavSidebarComponent {}

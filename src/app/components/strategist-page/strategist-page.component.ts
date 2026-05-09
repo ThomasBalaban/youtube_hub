@@ -2,6 +2,7 @@ import { Component, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { PageHeaderComponent } from '../page-header/page-header.component';
 import { PollingComponent } from '../../shared/polling.component';
 
 interface ServiceStatus { id: string; status: string; pid: number | null; }
@@ -78,7 +79,7 @@ type RecCategory = 'postmortems' | 'tailwind_critiques' | 'titles' | 'channel' |
 @Component({
   selector: 'app-strategist-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, PageHeaderComponent],
   templateUrl: './strategist-page.component.html',
   styleUrl: './strategist-page.component.scss',
 })

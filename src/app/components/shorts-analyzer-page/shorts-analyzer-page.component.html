@@ -1,13 +1,9 @@
 <div class="page-container">
-  <div class="page-header">
-    <div class="header-left">
-      <a routerLink="/" class="back-btn"><span>←</span><span>Hub</span></a>
-      <h1 class="page-title"><span class="icon" style="color: #38bdf8;">📊</span> Shorts Analyzer</h1>
-    </div>
-    <div class="header-right">
-      <span class="sub-label">Analyze a channel's top Shorts with Gemini</span>
-    </div>
-  </div>
+  <app-page-header
+    title="Shorts Analyzer"
+    icon="📊"
+    iconColor="#38bdf8"
+    subLabel="Analyze a channel's top Shorts with Gemini" />
 
   @if (!launcherOnline()) {
     <div class="banner-warn">⚠ Launcher offline — start it with <code>npm start</code></div>

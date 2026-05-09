@@ -24,7 +24,8 @@
       "Bash(ls shorts_analyzer/*.json)",
       "Bash(ls shorts_analyzer/data/analytics_cache/token.json)",
       "Bash(curl -sI \"https://yt3.ggpht.com/v9A1FgoWdIwpI5oNfy5vixe8g6aQEAlOtNWWiKIppifpC9n79nACmQsLtrXfd3NCZSvxB-DtyQ=s88-c-k-c0x00ffffff-no-rj\")",
-      "Bash(curl -sI -H \"Referer: http://localhost:4200/\" \"https://yt3.ggpht.com/v9A1FgoWdIwpI5oNfy5vixe8g6aQEAlOtNWWiKIppifpC9n79nACmQsLtrXfd3NCZSvxB-DtyQ=s88-c-k-c0x00ffffff-no-rj\")"
+      "Bash(curl -sI -H \"Referer: http://localhost:4200/\" \"https://yt3.ggpht.com/v9A1FgoWdIwpI5oNfy5vixe8g6aQEAlOtNWWiKIppifpC9n79nACmQsLtrXfd3NCZSvxB-DtyQ=s88-c-k-c0x00ffffff-no-rj\")",
+      "Bash(npx --no-install tsc --noEmit -p tsconfig.app.json)"
     ],
     "additionalDirectories": [
       "/Users/thomasbalaban/Downloads/projects/youtube-automator/auto run",

@@ -1,13 +1,9 @@
 <div class="page-container">
-  <div class="page-header">
-    <div class="header-left">
-      <a routerLink="/" class="back-btn"><span>←</span><span>Hub</span></a>
-      <h1 class="page-title"><span class="icon" style="color: #a855f7;">🔍</span> Backtrack Scanner</h1>
-    </div>
-    <div class="header-right">
-      <span class="sub-label">Scan SMB drive and copy videos locally</span>
-    </div>
-  </div>
+  <app-page-header
+    title="Backtrack Scanner"
+    icon="🔍"
+    iconColor="#a855f7"
+    subLabel="Scan SMB drive and copy videos locally" />
 
   @if (!launcherOnline()) {
     <div class="banner-warn">⚠ Launcher offline — start it with <code>npm start</code></div>
