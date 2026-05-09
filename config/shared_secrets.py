@@ -78,6 +78,32 @@ def get_openai_api_key() -> str:
     return get_secret("OPENAI_API_KEY")
 
 
+# ── OAuth credentials ─────────────────────────────────────────────────────
+# YouTube OAuth client_secret + token files live under config/oauth/.
+# Tokens are split by scope (each scope needs its own refresh token).
+
+_OAUTH_DIR = _HERE / "oauth"
+
+
+def get_oauth_dir() -> Path:
+    return _OAUTH_DIR
+
+
+def get_oauth_client_secrets_path() -> Path:
+    """Path to the canonical Desktop OAuth client_secret.json."""
+    return _OAUTH_DIR / "client_secret.json"
+
+
+def get_oauth_token_path(scope_name: str) -> Path:
+    """Path to a token file for a given scope.
+
+    `scope_name` is a short identifier — e.g. 'youtube_readonly' or
+    'yt_analytics'. The file is named `token_<scope_name>.json` and may not
+    exist yet (the OAuth flow creates it on first run).
+    """
+    return _OAUTH_DIR / f"token_{scope_name}.json"
+
+
 def export_to_env() -> None:
     """Populate os.environ with any secrets that aren't already set.
 

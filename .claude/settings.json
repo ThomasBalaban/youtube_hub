@@ -13,7 +13,18 @@
       "Bash(mv /Users/thomasbalaban/Downloads/projects/youtube-automator/youtube_hub/pipeline_routes.py \"/Users/thomasbalaban/Downloads/projects/youtube-automator/auto run/pipeline_routes.py\")",
       "Bash(mv /Users/thomasbalaban/Downloads/projects/youtube-automator/youtube_hub/pipeline_history.json \"/Users/thomasbalaban/Downloads/projects/youtube-automator/auto run/pipeline_history.json\")",
       "Bash(rm -rf /Users/thomasbalaban/Downloads/projects/youtube-automator/youtube_hub/__pycache__/pipeline_routes*.pyc)",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -c \"import json; a=json.load\\(open\\('client_secret.json'\\)\\)['installed']['client_id']; b=json.load\\(open\\('../youtube_shorts_publisher/client_secret.json'\\)\\)['installed']['client_id']; c=json.load\\(open\\('../youtube_shorts_publisher/client_secret1.json'\\)\\)['installed']['client_id']; print\\('analyzer client_id  :', a\\); print\\('publisher cs.json   :', b\\); print\\('publisher cs1.json  :', c\\); ta=json.load\\(open\\('token.json'\\)\\)['client_id']; tb=json.load\\(open\\('../youtube_shorts_publisher/token.json'\\)\\)['client_id']; print\\('analyzer token cid  :', ta\\); print\\('publisher token cid :', tb\\)\")",
+      "Bash(mkdir -p youtube_hub/config/oauth)",
+      "Bash(mv shorts_analyzer/client_secret.json youtube_hub/config/oauth/client_secret.json)",
+      "Bash(mv youtube_shorts_publisher/client_secret1.json youtube_hub/config/oauth/client_secret_alt.json)",
+      "Bash(mv youtube_shorts_publisher/token.json youtube_hub/config/oauth/token_youtube_readonly.json)",
+      "Bash(mv shorts_analyzer/data/analytics_cache/token.json youtube_hub/config/oauth/token_yt_analytics.json)",
+      "Bash(ls youtube_shorts_publisher/*.json)",
+      "Bash(ls shorts_analyzer/*.json)",
+      "Bash(ls shorts_analyzer/data/analytics_cache/token.json)",
+      "Bash(curl -sI \"https://yt3.ggpht.com/v9A1FgoWdIwpI5oNfy5vixe8g6aQEAlOtNWWiKIppifpC9n79nACmQsLtrXfd3NCZSvxB-DtyQ=s88-c-k-c0x00ffffff-no-rj\")",
+      "Bash(curl -sI -H \"Referer: http://localhost:4200/\" \"https://yt3.ggpht.com/v9A1FgoWdIwpI5oNfy5vixe8g6aQEAlOtNWWiKIppifpC9n79nACmQsLtrXfd3NCZSvxB-DtyQ=s88-c-k-c0x00ffffff-no-rj\")"
     ],
     "additionalDirectories": [
       "/Users/thomasbalaban/Downloads/projects/youtube-automator/auto run",

@@ -1,13 +1,15 @@
 # TODO
 
-- [ ] Fix the subtitle connection.
-- [ ] Fix the output on the shorts editor.
+- [ ] Auto-run items when Twitch starts / stops.
 
 ## Done
 
 - [x] Centralize API keys in `youtube_hub/config/secrets.json` and migrate
       sibling apps (`shorts_analyzer`, `shorts_strategist`, `shorts-auto-editor`,
       `youtube_shorts_publisher`) to read from `shared_secrets.py`.
+- [x] Centralize YouTube OAuth (client_secret + tokens) under
+      `youtube_hub/config/oauth/`. Analyzer analytics + publisher draft scanner
+      now resolve their paths via `shared_secrets.get_oauth_*`.
 
 ## Loose ends from the migration
 

@@ -1,13 +1,29 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive } from '@angular/router';
+
+interface AccountInfo {
+  channel_id?: string;
+  title?: string;
+  handle?: string;
+  avatar_url?: string;
+}
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive],
+  imports: [CommonModule, RouterLink, RouterLinkActive],
   template: `
     <nav class="sidebar">
-      <div class="sidebar-logo">YH</div>
+      <div class="sidebar-logo" [title]="account()?.title || 'YouTube Hub'">
+        @if (account()?.avatar_url) {
+          <img class="avatar" [src]="account()!.avatar_url" alt=""
+               referrerpolicy="no-referrer" />
+          <div class="account-name">{{ account()!.title }}</div>
+        } @else {
+          <div class="avatar-fallback">YH</div>
+        }
+      </div>
 
       <a routerLink="/"
          routerLinkActive="active"
@@ -61,4 +77,17 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
   `,
   styleUrl: './sidebar.component.scss',
 })
-export class NavSidebarComponent {}
+export class NavSidebarComponent implements OnInit {
+  account = signal<AccountInfo | null>(null);
+
+  async ngOnInit(): Promise<void> {
+    try {
+      const res = await fetch('/launcher/account/me');
+      if (!res.ok) return;
+      const data = (await res.json()) as AccountInfo;
+      this.account.set(data);
+    } catch {
+      // Launcher not running yet, or no OAuth token. Sidebar shows "YH" fallback.
+    }
+  }
+}

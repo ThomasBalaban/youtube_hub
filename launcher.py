@@ -294,6 +294,11 @@ app.include_router(backtrack_router, prefix="/launcher")
 from publisher_routes import router as publisher_router
 app.include_router(publisher_router, prefix="/launcher")
 
+# Account router — exposes the authenticated YouTube account info (title +
+# avatar URL) to the frontend sidebar via /launcher/account/me.
+from account_routes import router as account_router
+app.include_router(account_router, prefix="/launcher")
+
 # ─────────────────────────────────────────────
 # Routes
 # ─────────────────────────────────────────────

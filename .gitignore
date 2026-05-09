@@ -48,3 +48,4 @@ pipeline/steps/__pycache__/**
 
 # Centralized secrets — never commit
 config/secrets.json
+config/oauth/
