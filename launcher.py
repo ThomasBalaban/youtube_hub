@@ -288,9 +288,6 @@ app.include_router(subtitler_router, prefix="/launcher")
 from backtrack_routes import router as backtrack_router
 app.include_router(backtrack_router, prefix="/launcher")
 
-from pipeline import router as pipeline_router
-app.include_router(pipeline_router, prefix="/launcher")
-
 # Publisher router — provides /launcher/publisher/* for the frontend and
 # pipeline steps. Reads/writes runtime_settings.json in the publisher dir
 # so the publisher process picks up the correct mode at startup.

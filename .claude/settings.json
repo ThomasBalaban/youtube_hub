@@ -6,7 +6,16 @@
       "Bash(echo \"exit=$?\")",
       "Bash(conda env *)",
       "Read(//Users/thomasbalaban/miniconda3/envs/**)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(mkdir -p \"/Users/thomasbalaban/Downloads/projects/youtube-automator/auto run\")",
+      "Bash(mv /Users/thomasbalaban/Downloads/projects/youtube-automator/youtube_hub/pipeline \"/Users/thomasbalaban/Downloads/projects/youtube-automator/auto run/pipeline\")",
+      "Bash(mv /Users/thomasbalaban/Downloads/projects/youtube-automator/youtube_hub/src/app/components/auto-run-page \"/Users/thomasbalaban/Downloads/projects/youtube-automator/auto run/auto-run-page\")",
+      "Bash(mv /Users/thomasbalaban/Downloads/projects/youtube-automator/youtube_hub/pipeline_routes.py \"/Users/thomasbalaban/Downloads/projects/youtube-automator/auto run/pipeline_routes.py\")",
+      "Bash(mv /Users/thomasbalaban/Downloads/projects/youtube-automator/youtube_hub/pipeline_history.json \"/Users/thomasbalaban/Downloads/projects/youtube-automator/auto run/pipeline_history.json\")",
+      "Bash(rm -rf /Users/thomasbalaban/Downloads/projects/youtube-automator/youtube_hub/__pycache__/pipeline_routes*.pyc)"
+    ],
+    "additionalDirectories": [
+      "/Users/thomasbalaban/Downloads/projects/youtube-automator/auto run"
     ]
   }
 }
