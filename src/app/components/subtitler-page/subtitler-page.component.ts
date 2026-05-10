@@ -1,7 +1,6 @@
 import { Component, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { PollingComponent } from '../../shared/polling.component';
 import { PageHeaderComponent } from '../page-header/page-header.component';
 
@@ -65,7 +64,7 @@ const ANIMATION_TYPES = [
 @Component({
   selector: 'app-subtitler-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, PageHeaderComponent],
   templateUrl: './subtitler-page.component.html',
   styleUrl:    './subtitler-page.component.scss',
 })

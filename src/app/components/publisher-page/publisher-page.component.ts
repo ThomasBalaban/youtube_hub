@@ -1,7 +1,6 @@
 import { Component, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { PollingComponent } from '../../shared/polling.component';
 import { PageHeaderComponent } from '../page-header/page-header.component';
 
@@ -90,7 +89,7 @@ function modeToFlags(mode: RunMode) {
 @Component({
   selector: 'app-publisher-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, PageHeaderComponent],
   templateUrl: './publisher-page.component.html',
   styleUrl:    './publisher-page.component.scss',
 })
