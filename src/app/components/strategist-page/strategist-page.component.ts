@@ -73,7 +73,7 @@ interface RecommendationItem {
 }
 
 type Tab = 'recommendations' | 'cuts' | 'experiments' | 'traces';
-type RecCategory = 'postmortems' | 'tailwind_critiques' | 'titles' | 'channel' | 'capabilities' | 'edits';
+type RecCategory = 'postmortems' | 'tailwind_critiques' | 'titles' | 'metadata' | 'channel' | 'capabilities' | 'edits';
 
 @Component({
   selector: 'app-strategist-page',
@@ -159,6 +159,7 @@ export class StrategistPageComponent extends PollingComponent {
   readonly recCategories: Array<{ id: RecCategory; label: string }> = [
     { id: 'channel',            label: 'Channel reports' },
     { id: 'titles',             label: 'Title recs' },
+    { id: 'metadata',           label: 'Metadata' },
     { id: 'edits',              label: 'Edit reviews' },
     { id: 'capabilities',       label: 'Capability gaps' },
     { id: 'postmortems',        label: 'Postmortems' },

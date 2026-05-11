@@ -4,12 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { PollingComponent } from '../../shared/polling.component';
 import { PageHeaderComponent } from '../page-header/page-header.component';
 
-export type RunMode = 'analysis' | 'scraping' | 'publisher_batch' | 'uploader' | 'check_unuploaded';
+export type RunMode = 'scraping' | 'publisher_batch' | 'uploader' | 'check_unuploaded';
 
 export interface PublisherSettings {
   PROCESS_SINGLE_VIDEO: boolean;
   ENABLE_SCRAPING_MODE: boolean;
-  ENABLE_ANALYSIS_MODE: boolean;
   ENABLE_UPLOAD_MODE: boolean;
   VIDEOS_TO_PROCESS_COUNT: number;
 }
@@ -30,19 +29,6 @@ interface DataFileMeta {
   modified: number | null;
 }
 
-interface DraftAnalysisEntry {
-  description: string;
-  virality: number;
-  virality_reasoning: string;
-  game_name: string;
-  is_fnaf_game: boolean;
-  new_title: string;
-  youtube_description: string;
-  hashtags: string[];
-  tags: string;
-  title: string;
-}
-
 interface FailedShortsEntry {
   title: string;
   error: string;
@@ -61,7 +47,6 @@ interface BacktrackVideoEntry {
 }
 
 const MODE_META: Record<RunMode, { label: string; icon: string; desc: string; color: string }> = {
-  analysis:         { label: 'AI Analysis',     icon: '🤖', desc: 'Download drafts & analyze with Gemini',        color: '#a78bfa' },
   scraping:         { label: 'Scraper',          icon: '🕷',  desc: 'Scan & export draft/scheduled data to JSON',  color: '#fbbf24' },
   publisher_batch:  { label: 'Publish Batch',    icon: '⚡', desc: 'Process multiple drafts up to the set limit',  color: '#f87171' },
   uploader:         { label: 'Uploader',         icon: '📤', desc: 'Upload processed videos from output folder',   color: '#60a5fa' },
@@ -69,7 +54,6 @@ const MODE_META: Record<RunMode, { label: string; icon: string; desc: string; co
 };
 
 function settingsToMode(s: PublisherSettings): RunMode {
-  if (s.ENABLE_ANALYSIS_MODE) return 'analysis';
   if (s.ENABLE_SCRAPING_MODE) return 'scraping';
   if (s.ENABLE_UPLOAD_MODE)   return 'uploader';
   return 'publisher_batch'; // PROCESS_SINGLE_VIDEO=true OR all false → batch
@@ -77,7 +61,6 @@ function settingsToMode(s: PublisherSettings): RunMode {
 
 function modeToFlags(mode: RunMode) {
   return {
-    ENABLE_ANALYSIS_MODE: mode === 'analysis',
     ENABLE_SCRAPING_MODE: mode === 'scraping',
     ENABLE_UPLOAD_MODE:   mode === 'uploader',
     // PROCESS_SINGLE_VIDEO is the flag main.py checks to call run_publisher().
@@ -97,7 +80,7 @@ export class PublisherPageComponent extends PollingComponent {
   protected override pollingInterval = 4000;
 
   readonly MODE_META = MODE_META;
-  readonly modes: RunMode[] = ['analysis', 'scraping', 'publisher_batch', 'uploader', 'check_unuploaded'];
+  readonly modes: RunMode[] = ['scraping', 'publisher_batch', 'uploader', 'check_unuploaded'];
   readonly Math = Math;
 
   // ── Publisher controls ────────────────────────────────────────────────────
@@ -151,18 +134,11 @@ export class PublisherPageComponent extends PollingComponent {
   });
 
   // ── Typed content casts ───────────────────────────────────────────────────
-  asDraftAnalysis(): DraftAnalysisEntry[]   { return Array.isArray(this.selectedContent()) ? this.selectedContent() : []; }
   asFailedShorts():  FailedShortsEntry[]    { return Array.isArray(this.selectedContent()) ? this.selectedContent() : []; }
   asDraftVideos():   DraftVideoEntry[]      { return Array.isArray(this.selectedContent()) ? this.selectedContent() : []; }
   asBacktrack():     BacktrackVideoEntry[]  { return Array.isArray(this.selectedContent()) ? this.selectedContent() : []; }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  viralityColor(score: number): string {
-    if (score >= 8) return '#34d399';
-    if (score >= 6) return '#fbbf24';
-    return '#f87171';
-  }
-
   formatSize(bytes: number): string {
     if (bytes < 1024) return `${bytes}B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
@@ -347,6 +323,10 @@ export class PublisherPageComponent extends PollingComponent {
 
   async refreshLogs() {
     if (!this.launcherOnline()) return;
+    // Only overwrite the panel when the publisher service is actually
+    // running. Otherwise we'd clobber ad-hoc output (e.g. the audit
+    // result) with an empty service buffer on the next poll tick.
+    if (this.serviceStatus()?.status !== 'online') return;
     const res = await fetch('/launcher/services/youtube_publisher/logs?last=200').catch(() => null);
     if (res?.ok) { const d = await res.json(); this.logs.set(d.lines ?? []); }
   }

@@ -161,39 +161,7 @@
           <div class="viewer-empty"><span class="viewer-empty-icon">⚠</span><span>Could not load file.</span></div>
         } @else {
 
-          @if (selectedFile()?.key === 'draft_analysis') {
-            <div class="content-scroll">
-              @for (item of asDraftAnalysis(); track $index) {
-                <div class="analysis-card">
-                  <div class="analysis-header">
-                    <div class="analysis-titles">
-                      <span class="analysis-new-title">{{ item.new_title }}</span>
-                      <span class="analysis-orig-title">{{ item.title }}</span>
-                    </div>
-                    <div class="virality-badge"
-                         [style.color]="viralityColor(item.virality)"
-                         [style.border-color]="viralityColor(item.virality) + '55'"
-                         [style.background]="viralityColor(item.virality) + '18'">
-                      {{ item.virality }}<span class="virality-denom">/10</span>
-                    </div>
-                  </div>
-                  <div class="analysis-pills">
-                    @if (item.game_name && item.game_name !== 'Unknown') { <span class="pill pill-game">🎮 {{ item.game_name }}</span> }
-                    @if (item.is_fnaf_game) { <span class="pill pill-fnaf">🐻 FNAF</span> }
-                    @for (tag of item.hashtags; track tag) { <span class="pill pill-tag">{{ tag }}</span> }
-                  </div>
-                  <p class="analysis-reasoning">{{ item.virality_reasoning }}</p>
-                  <div class="analysis-caption">
-                    <span class="caption-label">Caption</span>
-                    <span class="caption-text">{{ item.youtube_description }}</span>
-                  </div>
-                </div>
-              }
-              <div class="content-footer">{{ asDraftAnalysis().length }} entries</div>
-            </div>
-          }
-
-          @else if (selectedFile()?.key === 'failed_shorts') {
+          @if (selectedFile()?.key === 'failed_shorts') {
             <div class="content-scroll">
               @for (item of asFailedShorts(); track $index) {
                 <div class="failed-card">
