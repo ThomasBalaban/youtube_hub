@@ -169,6 +169,15 @@
 
     <div class="right-panel">
 
+      <div class="panel-tabs">
+        <button class="panel-tab" [class.active]="rightPanelTab() === 'logs'"
+                (click)="rightPanelTab.set('logs')">Logs</button>
+        <button class="panel-tab" [class.active]="rightPanelTab() === 'layout'"
+                (click)="rightPanelTab.set('layout')">Layout</button>
+      </div>
+
+      @if (rightPanelTab() === 'logs') {
+
       <div class="viewer-header">
         @if (logViewState() === 'file') {
           <button class="viewer-back-btn" (click)="backToLogList()">← Back</button>
@@ -220,6 +229,131 @@
         } @else {
           <div class="log-content-body">{{ selectedLogContent() }}</div>
         }
+      }
+
+      }
+
+      @if (rightPanelTab() === 'layout') {
+        <div class="layout-editor">
+
+          <div class="layout-presets">
+            <select class="layout-select"
+                    [ngModel]="activePreset()"
+                    (ngModelChange)="setActivePreset($event)">
+              @if (regionPresets().length === 0) {
+                <option value="">No presets</option>
+              }
+              @for (p of regionPresets(); track p.name) {
+                <option [value]="p.name">{{ p.name }}</option>
+              }
+            </select>
+            <button class="layout-btn" (click)="newPreset()" title="New preset">＋ New</button>
+            <button class="layout-btn" (click)="duplicatePreset()"
+                    [disabled]="!currentPreset()" title="Duplicate">⧉ Copy</button>
+            <button class="layout-btn danger" (click)="deletePreset()"
+                    [disabled]="!currentPreset()" title="Delete">🗑 Delete</button>
+          </div>
+
+          @if (!currentPreset()) {
+            <div class="viewer-empty">
+              <span class="viewer-empty-icon">🎬</span>
+              <span>Create a layout preset, upload a short to grab a reference frame,
+                    then drag boxes over the camera and gameplay regions.</span>
+            </div>
+          } @else {
+            <div class="layout-row">
+              <label class="layout-field">
+                <span>Name</span>
+                <input type="text" [ngModel]="currentPreset()!.name"
+                       (change)="renamePreset($any($event.target).value)" />
+              </label>
+              <label class="layout-upload-btn">
+                <input type="file" accept="video/*" (change)="onVideoUpload($event)" hidden />
+                🎞 {{ currentPreset()!.image ? 'Replace frame' : 'Upload video' }}
+              </label>
+              @if (currentPreset()!.image && !pickingFrame()) {
+                <button class="layout-btn" (click)="clearImage()">Clear frame</button>
+              }
+            </div>
+
+            @if (pickingFrame()) {
+              <div class="frame-picker">
+                <video #vid class="picker-video" [src]="videoUrl()"
+                       (loadedmetadata)="onVideoMeta(vid)" (timeupdate)="onVideoTime(vid)"
+                       preload="auto" muted playsinline></video>
+                <input class="picker-scrub" type="range" min="0"
+                       [max]="videoDuration()" step="0.05"
+                       [value]="videoTime()" (input)="seekVideo(vid, $event)" />
+                <div class="picker-controls">
+                  <span class="picker-time">{{ formatTime(videoTime()) }} / {{ formatTime(videoDuration()) }}</span>
+                  <button class="layout-save-btn" (click)="captureFrame(vid)">Use this frame</button>
+                  <button class="layout-btn" (click)="cancelFramePicker()">Cancel</button>
+                </div>
+                <div class="region-hint">Scrub to a clear frame, then “Use this frame”.</div>
+              </div>
+            } @else {
+              <div class="region-toggle">
+                <span class="region-toggle-label">Editing:</span>
+                <button class="region-toggle-btn camera"
+                        [class.active]="editingRegion() === 'camera'"
+                        (click)="setEditingRegion('camera')">Camera</button>
+                <button class="region-toggle-btn gameplay"
+                        [class.active]="editingRegion() === 'gameplay'"
+                        (click)="setEditingRegion('gameplay')">Gameplay</button>
+              </div>
+
+              <div class="region-canvas"
+                   [class.no-image]="!currentPreset()!.image"
+                   (mousedown)="onRegionMouseDown($event)"
+                   (mousemove)="onRegionMouseMove($event)"
+                   (mouseup)="onRegionMouseUp()"
+                   (mouseleave)="onRegionMouseUp()">
+                @if (currentPreset()!.image) {
+                  <img class="region-img" [src]="currentPreset()!.image" draggable="false" alt="reference frame" />
+                } @else {
+                  <div class="region-canvas-hint">Upload a short to grab a reference frame, then drag to draw boxes</div>
+                }
+                <div class="region-box camera"
+                     [class.active]="editingRegion() === 'camera'"
+                     [style]="regionStyle(currentPreset()!.camera)"
+                     (mousedown)="onBoxDown($event, 'camera')">
+                  <span class="region-box-tag">Camera</span>
+                  @if (editingRegion() === 'camera') {
+                    @for (hdl of resizeHandles; track hdl) {
+                      <span class="region-handle h-{{ hdl }}" (mousedown)="onHandleDown($event, hdl)"></span>
+                    }
+                  }
+                </div>
+                <div class="region-box gameplay"
+                     [class.active]="editingRegion() === 'gameplay'"
+                     [style]="regionStyle(currentPreset()!.gameplay)"
+                     (mousedown)="onBoxDown($event, 'gameplay')">
+                  <span class="region-box-tag">Gameplay</span>
+                  @if (editingRegion() === 'gameplay') {
+                    @for (hdl of resizeHandles; track hdl) {
+                      <span class="region-handle h-{{ hdl }}" (mousedown)="onHandleDown($event, hdl)"></span>
+                    }
+                  }
+                </div>
+              </div>
+
+              <div class="region-hint">
+                Drag the active box to move it, or its handles to resize. Drag empty
+                space to redraw. The zoom punches into each box's centre; boxes stay
+                inside the 1080×1920 frame.
+              </div>
+            }
+
+            <div class="layout-save-row">
+              <button class="layout-save-btn" (click)="saveRegions()" [disabled]="regionsSaving()">
+                {{ regionsSaving() ? 'Saving…' : 'Save layout' }}
+              </button>
+              @if (regionsSaveDone()) { <span class="layout-save-ok">✓ Saved</span> }
+              @if (regionsSaveError()) { <span class="layout-save-err">{{ regionsSaveError() }}</span> }
+            </div>
+          }
+
+        </div>
       }
 
     </div>

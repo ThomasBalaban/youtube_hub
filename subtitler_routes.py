@@ -5,6 +5,7 @@ Settings are available via the launcher even when the API server is offline.
 """
 import json
 import os
+from typing import Any, Dict, List
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -20,6 +21,9 @@ DEFAULTS: dict = {
     "sync_offset": -0.15,
     "output_dir": os.path.join(os.path.expanduser("~"), "Desktop"),
     "enable_trimming": True,
+    # Layout presets for zoom focus, edited from the subtitler "Layout" tab.
+    "region_presets": [],
+    "active_preset": "",
 }
 
 
@@ -30,19 +34,33 @@ class SubtitlerSettings(BaseModel):
     enable_trimming: bool
 
 
-def _read() -> dict:
+class RegionsPayload(BaseModel):
+    region_presets: List[Dict[str, Any]]
+    active_preset: str
+
+
+def _read_raw() -> dict:
+    """Return the full saved settings dict (all keys), or {} if unreadable."""
     if os.path.exists(SETTINGS_FILE):
         try:
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
-                saved = json.load(f)
-            # Merge saved values onto defaults so new keys always exist
-            return {**DEFAULTS, **{k: saved[k] for k in DEFAULTS if k in saved}}
+                return json.load(f)
         except Exception:
             pass
-    return dict(DEFAULTS)
+    return {}
 
 
-def _write(data: dict) -> None:
+def _read() -> dict:
+    # Merge saved values onto defaults so new keys always exist, while
+    # preserving any extra keys other tools (scheduler, backtrack) persist.
+    return {**DEFAULTS, **_read_raw()}
+
+
+def _write_merged(updates: dict) -> None:
+    """Read-modify-write: update only the given keys, preserving everything
+    else already in hub_settings.json (region presets, schedule, etc.)."""
+    data = _read_raw()
+    data.update(updates)
     os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
@@ -55,5 +73,23 @@ def get_settings():
 
 @router.post("/settings")
 def post_settings(s: SubtitlerSettings):
-    _write(s.model_dump())
+    _write_merged(s.model_dump())
+    return {"ok": True}
+
+
+@router.get("/regions")
+def get_regions():
+    data = _read()
+    return {
+        "region_presets": data.get("region_presets", []),
+        "active_preset": data.get("active_preset", ""),
+    }
+
+
+@router.post("/regions")
+def post_regions(p: RegionsPayload):
+    _write_merged({
+        "region_presets": p.region_presets,
+        "active_preset": p.active_preset,
+    })
     return {"ok": True}

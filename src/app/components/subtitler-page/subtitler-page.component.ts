@@ -56,6 +56,20 @@ interface LogFile {
   size: number;
 }
 
+interface Region { x: number; y: number; w: number; h: number; }
+
+interface RegionPreset {
+  name: string;
+  image: string;       // data-URL thumbnail of a reference frame ('' if none)
+  camera: Region;
+  gameplay: Region;
+}
+
+// Sensible starting layout for a brand-new preset: VTuber bottom half,
+// gameplay top third (the current OBS scene).
+const DEFAULT_CAMERA_REGION:   Region = { x: 0, y: 0.5, w: 1, h: 0.5 };
+const DEFAULT_GAMEPLAY_REGION: Region = { x: 0, y: 0,   w: 1, h: 0.34 };
+
 const ANIMATION_TYPES = [
   'Auto', 'Drift & Fade', 'Wiggle', 'Pop & Shrink',
   'Shake', 'Pulse', 'Wave', 'Explode-Out', 'Hyper Bounce', 'Static',
@@ -102,6 +116,33 @@ export class SubtitlerPageComponent extends PollingComponent {
   selectedLogFile   = signal<LogFile | null>(null);
   selectedLogContent = signal<string>('');
   logFileLoading    = signal(false);
+
+  // ── Right-panel tab + layout-region state ───────────────────────────────────
+  rightPanelTab    = signal<'logs' | 'layout'>('logs');
+  regionPresets    = signal<RegionPreset[]>([]);
+  activePreset     = signal<string>('');
+  regionsLoaded    = signal(false);
+  editingRegion    = signal<'camera' | 'gameplay'>('camera');
+  regionsSaving    = signal(false);
+  regionsSaveDone  = signal(false);
+  regionsSaveError = signal('');
+  draggingRegion   = signal(false);
+  private interaction: {
+    mode: 'draw' | 'move' | 'resize';
+    handle: string;
+    startX: number;
+    startY: number;
+    startRegion: Region;
+  } | null = null;
+
+  // Reference-frame picker state
+  pickingFrame  = signal(false);
+  videoUrl      = signal<string>('');
+  videoDuration = signal(0);
+  videoTime     = signal(0);
+
+  currentPreset = computed(() =>
+    this.regionPresets().find(p => p.name === this.activePreset()) ?? null);
 
   // ── Computed ───────────────────────────────────────────────────────────────
   isProcessing    = computed(() => this.processStatus()?.processing ?? false);
@@ -223,6 +264,17 @@ export class SubtitlerPageComponent extends PollingComponent {
       if (r?.ok) { this.settings.set(await r.json()); this.settingsLoaded.set(true); }
     }
 
+    // Layout region presets load once via launcher (no API needed)
+    if (!this.regionsLoaded()) {
+      const r = await fetch('/launcher/subtitler-settings/regions').catch(() => null);
+      if (r?.ok) {
+        const d = await r.json();
+        this.regionPresets.set((d.region_presets ?? []) as RegionPreset[]);
+        this.activePreset.set(d.active_preset ?? '');
+        this.regionsLoaded.set(true);
+      }
+    }
+
     if (this.apiOnline()) {
       const [statusRes, filesRes, logsRes, analyzerRes] = await Promise.allSettled([
         fetch('/shorts-editor/process/status'),
@@ -282,6 +334,280 @@ export class SubtitlerPageComponent extends PollingComponent {
     this.selectedLogFile.set(null);
     this.selectedLogContent.set('');
     this.refreshLogFiles();
+  }
+
+  // ── Layout region editor ─────────────────────────────────────────────────────
+  setActivePreset(name: string) { this.activePreset.set(name); }
+  setEditingRegion(which: 'camera' | 'gameplay') { this.editingRegion.set(which); }
+
+  private _uniquePresetName(base = 'layout'): string {
+    const taken = new Set(this.regionPresets().map(p => p.name));
+    if (!taken.has(base)) return base;
+    let i = 2;
+    while (taken.has(`${base} ${i}`)) i++;
+    return `${base} ${i}`;
+  }
+
+  newPreset() {
+    const name = this._uniquePresetName();
+    const preset: RegionPreset = {
+      name,
+      image: '',
+      camera:   { ...DEFAULT_CAMERA_REGION },
+      gameplay: { ...DEFAULT_GAMEPLAY_REGION },
+    };
+    this.regionPresets.update(list => [...list, preset]);
+    this.activePreset.set(name);
+  }
+
+  duplicatePreset() {
+    const cur = this.currentPreset();
+    if (!cur) return;
+    const name = this._uniquePresetName(`${cur.name} copy`);
+    const copy: RegionPreset = {
+      name,
+      image: cur.image,
+      camera:   { ...cur.camera },
+      gameplay: { ...cur.gameplay },
+    };
+    this.regionPresets.update(list => [...list, copy]);
+    this.activePreset.set(name);
+  }
+
+  deletePreset() {
+    const name = this.activePreset();
+    if (!name) return;
+    const remaining = this.regionPresets().filter(p => p.name !== name);
+    this.regionPresets.set(remaining);
+    this.activePreset.set(remaining.length ? remaining[0].name : '');
+  }
+
+  renamePreset(raw: string) {
+    const name = raw.trim();
+    const old = this.activePreset();
+    if (!name || name === old) return;
+    if (this.regionPresets().some(p => p.name === name)) return; // keep names unique
+    this.regionPresets.update(list =>
+      list.map(p => (p.name === old ? { ...p, name } : p)));
+    this.activePreset.set(name);
+  }
+
+  private patchCurrentPreset(patch: Partial<RegionPreset>) {
+    const name = this.activePreset();
+    this.regionPresets.update(list =>
+      list.map(p => (p.name === name ? { ...p, ...patch } : p)));
+  }
+
+  regionStyle(r: Region) {
+    return {
+      left:   (r.x * 100) + '%',
+      top:    (r.y * 100) + '%',
+      width:  (r.w * 100) + '%',
+      height: (r.h * 100) + '%',
+    };
+  }
+
+  // The active region's box can be drawn fresh, moved, or resized by its
+  // 8 handles. Dragging empty canvas draws a new box; dragging the box body
+  // moves it; dragging a handle resizes from that edge/corner. Everything is
+  // clamped so the box never leaves the 0–1 frame.
+  readonly resizeHandles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+
+  private _editingRect(): Region {
+    const p = this.currentPreset()!;
+    return this.editingRegion() === 'camera' ? p.camera : p.gameplay;
+  }
+
+  onRegionMouseDown(e: MouseEvent) {
+    if (!this.currentPreset()) return;
+    const m = this._mouseNorm(e);
+    this.interaction = {
+      mode: 'draw', handle: '',
+      startX: m.x, startY: m.y, startRegion: { x: m.x, y: m.y, w: 0, h: 0 },
+    };
+    this.draggingRegion.set(true);
+    this._applyInteraction(m.x, m.y);
+    e.preventDefault();
+  }
+
+  onBoxDown(e: MouseEvent, which: 'camera' | 'gameplay') {
+    if (!this.currentPreset()) return;
+    // Clicking a box auto-selects it as the region being edited.
+    if (this.editingRegion() !== which) this.editingRegion.set(which);
+    const region = which === 'camera'
+      ? this.currentPreset()!.camera : this.currentPreset()!.gameplay;
+    const m = this._mouseNorm(e);
+    this.interaction = {
+      mode: 'move', handle: '',
+      startX: m.x, startY: m.y, startRegion: { ...region },
+    };
+    this.draggingRegion.set(true);
+    e.stopPropagation();
+    e.preventDefault();
+  }
+
+  onHandleDown(e: MouseEvent, handle: string) {
+    if (!this.currentPreset()) return;
+    const m = this._mouseNorm(e);
+    this.interaction = {
+      mode: 'resize', handle,
+      startX: m.x, startY: m.y, startRegion: { ...this._editingRect() },
+    };
+    this.draggingRegion.set(true);
+    e.stopPropagation();
+    e.preventDefault();
+  }
+
+  onRegionMouseMove(e: MouseEvent) {
+    if (!this.interaction) return;
+    const m = this._mouseNorm(e);
+    this._applyInteraction(m.x, m.y);
+  }
+
+  onRegionMouseUp() {
+    this.interaction = null;
+    this.draggingRegion.set(false);
+  }
+
+  private _clamp01(v: number) { return Math.max(0, Math.min(1, v)); }
+
+  // Mouse position normalized (0–1) against the .region-canvas element, which
+  // is the canvas itself for canvas handlers and an ancestor for box/handle ones.
+  private _mouseNorm(e: MouseEvent): { x: number; y: number } {
+    const el = e.currentTarget as HTMLElement;
+    const canvas = (el.closest('.region-canvas') as HTMLElement) ?? el;
+    const rect = canvas.getBoundingClientRect();
+    // getBoundingClientRect() is the border box, but the image and region boxes
+    // are positioned against the inner (padding) box. Offset by the border
+    // (clientLeft/Top) and use the inner size (clientWidth/Height) so 0–1 lines
+    // up exactly with the frame edges.
+    return {
+      x: this._clamp01((e.clientX - rect.left - canvas.clientLeft) / canvas.clientWidth),
+      y: this._clamp01((e.clientY - rect.top - canvas.clientTop) / canvas.clientHeight),
+    };
+  }
+
+  private _applyInteraction(mx: number, my: number) {
+    const it = this.interaction;
+    if (!it) return;
+    const MIN = 0.02;
+    let region: Region;
+
+    if (it.mode === 'draw') {
+      region = {
+        x: Math.min(it.startX, mx), y: Math.min(it.startY, my),
+        w: Math.abs(mx - it.startX), h: Math.abs(my - it.startY),
+      };
+    } else if (it.mode === 'move') {
+      const dx = mx - it.startX, dy = my - it.startY;
+      const w = it.startRegion.w, h = it.startRegion.h;
+      region = {
+        w, h,
+        x: Math.max(0, Math.min(1 - w, it.startRegion.x + dx)),
+        y: Math.max(0, Math.min(1 - h, it.startRegion.y + dy)),
+      };
+      this.patchCurrentPreset({ [this.editingRegion()]: region } as Partial<RegionPreset>);
+      return; // move preserves size; no edge clamping needed
+    } else { // resize — move whichever edges the handle controls
+      let left = it.startRegion.x, right = it.startRegion.x + it.startRegion.w;
+      let top = it.startRegion.y, bottom = it.startRegion.y + it.startRegion.h;
+      const h = it.handle;
+      if (h.includes('w')) left = mx;
+      if (h.includes('e')) right = mx;
+      if (h.includes('n')) top = my;
+      if (h.includes('s')) bottom = my;
+      if (right < left) [left, right] = [right, left];
+      if (bottom < top) [top, bottom] = [bottom, top];
+      region = { x: left, y: top, w: right - left, h: bottom - top };
+    }
+
+    // Clamp into frame + enforce a minimum size (draw/resize).
+    region.x = this._clamp01(region.x);
+    region.y = this._clamp01(region.y);
+    region.w = Math.max(MIN, Math.min(1 - region.x, region.w));
+    region.h = Math.max(MIN, Math.min(1 - region.y, region.h));
+    this.patchCurrentPreset({ [this.editingRegion()]: region } as Partial<RegionPreset>);
+  }
+
+  clearImage() { this.patchCurrentPreset({ image: '' }); }
+
+  // ── Reference-frame picker (upload a short, scrub, grab a frame) ─────────────
+  onVideoUpload(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !this.currentPreset()) return;
+    this._revokeVideo();
+    this.videoUrl.set(URL.createObjectURL(file));
+    this.videoDuration.set(0);
+    this.videoTime.set(0);
+    this.pickingFrame.set(true);
+    input.value = '';
+  }
+
+  onVideoMeta(v: HTMLVideoElement) { this.videoDuration.set(v.duration || 0); }
+  onVideoTime(v: HTMLVideoElement) { this.videoTime.set(v.currentTime || 0); }
+
+  seekVideo(v: HTMLVideoElement, e: Event) {
+    const t = +(e.target as HTMLInputElement).value;
+    v.currentTime = t;
+    this.videoTime.set(t);
+  }
+
+  captureFrame(v: HTMLVideoElement) {
+    if (!this.currentPreset()) return;
+    const vw = v.videoWidth, vh = v.videoHeight;
+    if (!vw || !vh) { this.regionsSaveError.set('Frame not ready yet'); return; }
+    const maxW = 360;
+    const scale = Math.min(1, maxW / vw);
+    const w = Math.round(vw * scale), h = Math.round(vh * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(v, 0, 0, w, h);
+    this.patchCurrentPreset({ image: canvas.toDataURL('image/jpeg', 0.7) });
+    this.cancelFramePicker();
+  }
+
+  cancelFramePicker() {
+    this.pickingFrame.set(false);
+    this._revokeVideo();
+  }
+
+  private _revokeVideo() {
+    const u = this.videoUrl();
+    if (u) URL.revokeObjectURL(u);
+    this.videoUrl.set('');
+  }
+
+  formatTime(secs: number): string {
+    if (!isFinite(secs) || secs < 0) secs = 0;
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+
+  async saveRegions() {
+    this.regionsSaving.set(true);
+    this.regionsSaveError.set('');
+    this.regionsSaveDone.set(false);
+    try {
+      const body = JSON.stringify({
+        region_presets: this.regionPresets(),
+        active_preset: this.activePreset(),
+      });
+      const res = await fetch('/launcher/subtitler-settings/regions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      this.regionsSaveDone.set(true);
+      setTimeout(() => this.regionsSaveDone.set(false), 2000);
+    } catch (e: any) {
+      this.regionsSaveError.set(e?.message ?? 'Save failed');
+    } finally {
+      this.regionsSaving.set(false);
+    }
   }
 
   // ── File actions ───────────────────────────────────────────────────────────
