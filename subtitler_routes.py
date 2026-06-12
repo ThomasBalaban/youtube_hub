@@ -21,6 +21,12 @@ DEFAULTS: dict = {
     "sync_offset": -0.15,
     "output_dir": os.path.join(os.path.expanduser("~"), "Desktop"),
     "enable_trimming": True,
+    # Processing toggles / inputs (global).
+    "camera_mode": "vtuber",          # "vtuber" | "facecam" | "none"
+    "game_subtitles_enabled": True,
+    "onomatopoeia_enabled": True,
+    "mic_track_index": "a:1",
+    "game_track_index": "a:2",
     # Layout presets for zoom focus, edited from the subtitler "Layout" tab.
     "region_presets": [],
     "active_preset": "",
@@ -32,6 +38,11 @@ class SubtitlerSettings(BaseModel):
     sync_offset: float
     output_dir: str
     enable_trimming: bool
+    camera_mode: str = "vtuber"
+    game_subtitles_enabled: bool = True
+    onomatopoeia_enabled: bool = True
+    mic_track_index: str = "a:1"
+    game_track_index: str = "a:2"
 
 
 class RegionsPayload(BaseModel):

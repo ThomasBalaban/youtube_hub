@@ -84,23 +84,32 @@
         <div class="settings-grid">
           <div class="setting-row">
             <div class="setting-info">
-              <span class="setting-name">Animation Type</span>
-              <span class="setting-desc">Comic book effect style for onomatopoeia overlays</span>
+              <span class="setting-name">Camera Type</span>
+              <span class="setting-desc">What's on camera — tunes the AI's cam zooms and gaze check</span>
             </div>
-            <select class="setting-select" [ngModel]="settings().animation_type" (ngModelChange)="setAnimationType($event)">
-              @for (anim of animationTypes; track anim) { <option [value]="anim">{{ anim }}</option> }
+            <select class="setting-select" [ngModel]="settings().camera_mode" (ngModelChange)="setCameraMode($event)">
+              <option value="vtuber">VTuber</option>
+              <option value="facecam">Facecam</option>
+              <option value="none">No camera</option>
             </select>
           </div>
           <div class="setting-row">
             <div class="setting-info">
-              <span class="setting-name">Sync Offset</span>
-              <span class="setting-desc">Shift onomatopoeia timing relative to audio events</span>
+              <span class="setting-name">Mic Audio Track</span>
+              <span class="setting-desc">Which recording track holds your voice</span>
             </div>
-            <div class="slider-group">
-              <input type="range" class="sync-slider" min="-0.5" max="0.5" step="0.05"
-                     [ngModel]="settings().sync_offset" (ngModelChange)="setSyncOffset($event)">
-              <span class="slider-value">{{ settings().sync_offset.toFixed(2) }}s</span>
+            <select class="setting-select" [ngModel]="settings().mic_track_index" (ngModelChange)="setMicTrack($event)">
+              @for (t of audioTracks; track t) { <option [value]="t">{{ t }}</option> }
+            </select>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">Game Audio Track</span>
+              <span class="setting-desc">Which recording track holds the game/desktop audio</span>
             </div>
+            <select class="setting-select" [ngModel]="settings().game_track_index" (ngModelChange)="setGameTrack($event)">
+              @for (t of audioTracks; track t) { <option [value]="t">{{ t }}</option> }
+            </select>
           </div>
           <div class="setting-row">
             <div class="setting-info">
@@ -111,6 +120,35 @@
               <span class="toggle-knob"></span>
             </button>
           </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">Game Subtitles</span>
+              <span class="setting-desc">Show subtitles transcribed from the game/desktop audio track</span>
+            </div>
+            <button class="toggle" [class.on]="settings().game_subtitles_enabled" (click)="toggleGameSubtitles()">
+              <span class="toggle-knob"></span>
+            </button>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">Onomatopoeia</span>
+              <span class="setting-desc">Comic-book sound words (off still feeds the AI's zoom decisions)</span>
+            </div>
+            <button class="toggle" [class.on]="settings().onomatopoeia_enabled" (click)="toggleOnomatopoeia()">
+              <span class="toggle-knob"></span>
+            </button>
+          </div>
+          @if (settings().onomatopoeia_enabled) {
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-name">Animation Type</span>
+                <span class="setting-desc">Comic book effect style for onomatopoeia overlays</span>
+              </div>
+              <select class="setting-select" [ngModel]="settings().animation_type" (ngModelChange)="setAnimationType($event)">
+                @for (anim of animationTypes; track anim) { <option [value]="anim">{{ anim }}</option> }
+              </select>
+            </div>
+          }
           <div class="setting-row setting-row--full">
             <div class="setting-info">
               <span class="setting-name">Output Directory</span>
@@ -146,35 +184,39 @@
         @if (saveError()) { <div class="error-msg">⚠ {{ saveError() }}</div> }
       </section>
 
-      <section class="log-section">
-        <div class="log-header">
-          <div class="log-header-left">
-            <h2 class="section-title" style="margin:0">stdout — API</h2>
-            @if (isProcessing()) { <span class="live-badge">● live</span> }
-          </div>
-          <div class="log-header-right">
-            <button class="log-btn" (click)="poll()">↻</button>
-            <button class="log-btn log-btn--clear" (click)="clearLogs()">✕</button>
-          </div>
-        </div>
-        <div class="log-body">
-          @for (line of logs(); track $index) {
-            <div class="log-line" [class.err]="isErr(line)" [class.ok]="isOk(line)" [class.warn]="isWarn(line)">{{ line }}</div>
-          }
-          @if (!logs().length) { <div class="log-empty">No output yet.</div> }
-        </div>
-      </section>
-
     </div>
 
     <div class="right-panel">
 
       <div class="panel-tabs">
+        <button class="panel-tab" [class.active]="rightPanelTab() === 'stdout'"
+                (click)="rightPanelTab.set('stdout')">stdout</button>
         <button class="panel-tab" [class.active]="rightPanelTab() === 'logs'"
                 (click)="rightPanelTab.set('logs')">Logs</button>
         <button class="panel-tab" [class.active]="rightPanelTab() === 'layout'"
                 (click)="rightPanelTab.set('layout')">Layout</button>
       </div>
+
+      @if (rightPanelTab() === 'stdout') {
+        <section class="log-section in-panel">
+          <div class="log-header">
+            <div class="log-header-left">
+              <h2 class="section-title" style="margin:0">stdout — API</h2>
+              @if (isProcessing()) { <span class="live-badge">● live</span> }
+            </div>
+            <div class="log-header-right">
+              <button class="log-btn" (click)="poll()">↻</button>
+              <button class="log-btn log-btn--clear" (click)="clearLogs()">✕</button>
+            </div>
+          </div>
+          <div class="log-body">
+            @for (line of logs(); track $index) {
+              <div class="log-line" [class.err]="isErr(line)" [class.ok]="isOk(line)" [class.warn]="isWarn(line)">{{ line }}</div>
+            }
+            @if (!logs().length) { <div class="log-empty">No output yet.</div> }
+          </div>
+        </section>
+      }
 
       @if (rightPanelTab() === 'logs') {
 
@@ -294,9 +336,11 @@
             } @else {
               <div class="region-toggle">
                 <span class="region-toggle-label">Editing:</span>
-                <button class="region-toggle-btn camera"
-                        [class.active]="editingRegion() === 'camera'"
-                        (click)="setEditingRegion('camera')">Camera</button>
+                @if (camMode() !== 'none') {
+                  <button class="region-toggle-btn camera"
+                          [class.active]="editingRegion() === 'camera'"
+                          (click)="setEditingRegion('camera')">Camera</button>
+                }
                 <button class="region-toggle-btn gameplay"
                         [class.active]="editingRegion() === 'gameplay'"
                         (click)="setEditingRegion('gameplay')">Gameplay</button>
@@ -313,17 +357,19 @@
                 } @else {
                   <div class="region-canvas-hint">Upload a short to grab a reference frame, then drag to draw boxes</div>
                 }
-                <div class="region-box camera"
-                     [class.active]="editingRegion() === 'camera'"
-                     [style]="regionStyle(currentPreset()!.camera)"
-                     (mousedown)="onBoxDown($event, 'camera')">
-                  <span class="region-box-tag">Camera</span>
-                  @if (editingRegion() === 'camera') {
-                    @for (hdl of resizeHandles; track hdl) {
-                      <span class="region-handle h-{{ hdl }}" (mousedown)="onHandleDown($event, hdl)"></span>
+                @if (camMode() !== 'none') {
+                  <div class="region-box camera"
+                       [class.active]="editingRegion() === 'camera'"
+                       [style]="regionStyle(currentPreset()!.camera)"
+                       (mousedown)="onBoxDown($event, 'camera')">
+                    <span class="region-box-tag">Camera</span>
+                    @if (editingRegion() === 'camera') {
+                      @for (hdl of resizeHandles; track hdl) {
+                        <span class="region-handle h-{{ hdl }}" (mousedown)="onHandleDown($event, hdl)"></span>
+                      }
                     }
-                  }
-                </div>
+                  </div>
+                }
                 <div class="region-box gameplay"
                      [class.active]="editingRegion() === 'gameplay'"
                      [style]="regionStyle(currentPreset()!.gameplay)"
@@ -335,12 +381,24 @@
                     }
                   }
                 </div>
+
+                <!-- Subtitle position markers (drag vertically) -->
+                <div class="sub-marker mic" [style]="subStyle(micSubY())"
+                     (mousedown)="onSubMarkerDown($event, 'mic')">
+                  <span class="sub-marker-tag">Mic subs</span>
+                </div>
+                @if (settings().game_subtitles_enabled) {
+                  <div class="sub-marker game" [style]="subStyle(gameSubY())"
+                       (mousedown)="onSubMarkerDown($event, 'game')">
+                    <span class="sub-marker-tag">Game subs</span>
+                  </div>
+                }
               </div>
 
               <div class="region-hint">
-                Drag the active box to move it, or its handles to resize. Drag empty
-                space to redraw. The zoom punches into each box's centre; boxes stay
-                inside the 1080×1920 frame.
+                Drag boxes to move/resize the zoom focus. Drag the dashed lines to
+                place where the mic and game subtitles sit. Everything stays inside
+                the 1080×1920 frame.
               </div>
             }
 

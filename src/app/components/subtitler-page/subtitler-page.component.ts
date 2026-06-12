@@ -27,7 +27,14 @@ interface SubtitlerSettings {
   sync_offset: number;
   output_dir: string;
   enable_trimming: boolean;
+  camera_mode: CameraMode;
+  game_subtitles_enabled: boolean;
+  onomatopoeia_enabled: boolean;
+  mic_track_index: string;
+  game_track_index: string;
 }
+
+const AUDIO_TRACKS = ['a:0', 'a:1', 'a:2', 'a:3'];
 
 interface AnalyzerStatus {
   base_url: string;
@@ -58,17 +65,25 @@ interface LogFile {
 
 interface Region { x: number; y: number; w: number; h: number; }
 
+type CameraMode = 'vtuber' | 'facecam' | 'none';
+
 interface RegionPreset {
   name: string;
   image: string;       // data-URL thumbnail of a reference frame ('' if none)
   camera: Region;
   gameplay: Region;
+  mic_subtitle_y?: number;      // 0=top, 1=bottom (vertical placement of mic subs)
+  game_subtitle_y?: number;     // 0=top, 1=bottom (vertical placement of game subs)
 }
 
 // Sensible starting layout for a brand-new preset: VTuber bottom half,
 // gameplay top third (the current OBS scene).
 const DEFAULT_CAMERA_REGION:   Region = { x: 0, y: 0.5, w: 1, h: 0.5 };
 const DEFAULT_GAMEPLAY_REGION: Region = { x: 0, y: 0,   w: 1, h: 0.34 };
+// Subtitle defaults match the pipeline's legacy MarginV (mic 640, game 80).
+const DEFAULT_MIC_SUB_Y  = 0.667;
+const DEFAULT_GAME_SUB_Y = 0.958;
+const CAMERA_MODES: CameraMode[] = ['vtuber', 'facecam', 'none'];
 
 const ANIMATION_TYPES = [
   'Auto', 'Drift & Fade', 'Wiggle', 'Pop & Shrink',
@@ -96,7 +111,13 @@ export class SubtitlerPageComponent extends PollingComponent {
     sync_offset:    -0.15,
     output_dir:     '',
     enable_trimming: true,
+    camera_mode: 'vtuber',
+    game_subtitles_enabled: true,
+    onomatopoeia_enabled: true,
+    mic_track_index: 'a:1',
+    game_track_index: 'a:2',
   });
+  readonly audioTracks = AUDIO_TRACKS;
   analyzerStatus = signal<AnalyzerStatus | null>(null);
   serviceStatus  = signal<ServiceStatus | null>(null);
   strategistOnline = signal(false);
@@ -118,7 +139,7 @@ export class SubtitlerPageComponent extends PollingComponent {
   logFileLoading    = signal(false);
 
   // ── Right-panel tab + layout-region state ───────────────────────────────────
-  rightPanelTab    = signal<'logs' | 'layout'>('logs');
+  rightPanelTab    = signal<'stdout' | 'logs' | 'layout'>('stdout');
   regionPresets    = signal<RegionPreset[]>([]);
   activePreset     = signal<string>('');
   regionsLoaded    = signal(false);
@@ -128,8 +149,8 @@ export class SubtitlerPageComponent extends PollingComponent {
   regionsSaveError = signal('');
   draggingRegion   = signal(false);
   private interaction: {
-    mode: 'draw' | 'move' | 'resize';
-    handle: string;
+    mode: 'draw' | 'move' | 'resize' | 'sub';
+    handle: string;            // resize handle id, or 'mic'/'game' for sub markers
     startX: number;
     startY: number;
     startRegion: Region;
@@ -172,6 +193,10 @@ export class SubtitlerPageComponent extends PollingComponent {
   setSyncOffset(v: number)      { this.settings.update(s => ({ ...s, sync_offset: +v })); }
   setOutputDir(v: string)       { this.settings.update(s => ({ ...s, output_dir: v })); }
   toggleTrimming()              { this.settings.update(s => ({ ...s, enable_trimming: !s.enable_trimming })); }
+  toggleGameSubtitles()         { this.settings.update(s => ({ ...s, game_subtitles_enabled: !s.game_subtitles_enabled })); }
+  toggleOnomatopoeia()          { this.settings.update(s => ({ ...s, onomatopoeia_enabled: !s.onomatopoeia_enabled })); }
+  setMicTrack(v: string)        { this.settings.update(s => ({ ...s, mic_track_index: v })); }
+  setGameTrack(v: string)       { this.settings.update(s => ({ ...s, game_track_index: v })); }
 
   // ── Thinker meta ───────────────────────────────────────────────────────────
   thinkerOffline = computed(() => {
@@ -355,6 +380,8 @@ export class SubtitlerPageComponent extends PollingComponent {
       image: '',
       camera:   { ...DEFAULT_CAMERA_REGION },
       gameplay: { ...DEFAULT_GAMEPLAY_REGION },
+      mic_subtitle_y: DEFAULT_MIC_SUB_Y,
+      game_subtitle_y: DEFAULT_GAME_SUB_Y,
     };
     this.regionPresets.update(list => [...list, preset]);
     this.activePreset.set(name);
@@ -369,10 +396,19 @@ export class SubtitlerPageComponent extends PollingComponent {
       image: cur.image,
       camera:   { ...cur.camera },
       gameplay: { ...cur.gameplay },
+      mic_subtitle_y: this.micSubY(),
+      game_subtitle_y: this.gameSubY(),
     };
     this.regionPresets.update(list => [...list, copy]);
     this.activePreset.set(name);
   }
+
+  // ── Camera mode (global) + per-preset subtitle positions ─────────────────────
+  readonly cameraModes = CAMERA_MODES;
+  camMode(): CameraMode { return this.settings().camera_mode; }
+  setCameraMode(m: CameraMode) { this.settings.update(s => ({ ...s, camera_mode: m })); }
+  micSubY(): number  { return this.currentPreset()?.mic_subtitle_y ?? DEFAULT_MIC_SUB_Y; }
+  gameSubY(): number { return this.currentPreset()?.game_subtitle_y ?? DEFAULT_GAME_SUB_Y; }
 
   deletePreset() {
     const name = this.activePreset();
@@ -487,11 +523,32 @@ export class SubtitlerPageComponent extends PollingComponent {
     };
   }
 
+  // Drag a full-width subtitle marker vertically.
+  onSubMarkerDown(e: MouseEvent, which: 'mic' | 'game') {
+    if (!this.currentPreset()) return;
+    const m = this._mouseNorm(e);
+    this.interaction = {
+      mode: 'sub', handle: which,
+      startX: m.x, startY: m.y, startRegion: { x: 0, y: 0, w: 0, h: 0 },
+    };
+    this.draggingRegion.set(true);
+    e.stopPropagation();
+    e.preventDefault();
+  }
+
+  subStyle(y: number) { return { top: (y * 100) + '%' }; }
+
   private _applyInteraction(mx: number, my: number) {
     const it = this.interaction;
     if (!it) return;
     const MIN = 0.02;
     let region: Region;
+
+    if (it.mode === 'sub') {
+      const key = it.handle === 'mic' ? 'mic_subtitle_y' : 'game_subtitle_y';
+      this.patchCurrentPreset({ [key]: this._clamp01(my) } as Partial<RegionPreset>);
+      return;
+    }
 
     if (it.mode === 'draw') {
       region = {

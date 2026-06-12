@@ -140,6 +140,13 @@
   background: #0d0d0d; min-height: 0;
 }
 
+// stdout card sits flush inside the right panel (no card border/radius there).
+.log-section.in-panel {
+  border: none;
+  border-radius: 0;
+  min-height: 0;
+}
+
 // ── Right-panel tabs ────────────────────────────────────────────────────────
 .panel-tabs {
   display: flex; gap: 4px; padding: 0.5rem 0.75rem 0;
@@ -181,13 +188,32 @@
 }
 .layout-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
 .layout-field {
-  display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 120px;
+  display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 110px;
   span { font-size: 0.66rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
-  input {
+  input, select {
     background: #161616; border: 1px solid #2a2a2a; color: #e0e0e0;
     font-size: 0.78rem; padding: 5px 8px; border-radius: 6px;
     &:focus { outline: none; border-color: #34d399; }
   }
+}
+
+// ── Subtitle position markers ───────────────────────────────────────────────
+.sub-marker {
+  // 14px-tall transparent grab band; the dashed line sits at the very top, so
+  // the line marks the exact subtitle position and there's room to grab it.
+  position: absolute; left: 0; right: 0; height: 14px;
+  border-top: 2px dashed; box-sizing: border-box;
+  cursor: ns-resize; pointer-events: auto; z-index: 3;
+  &.mic  { border-color: #f472b6; }
+  &.game { border-color: #a3e635; }
+  &:hover { background: rgba(255,255,255,0.04); }
+}
+.sub-marker-tag {
+  position: absolute; right: 6px; top: -9px; font-size: 0.58rem; font-weight: 700;
+  padding: 1px 6px; border-radius: 4px; color: #0d0d0d; white-space: nowrap;
+  pointer-events: none;
+  .sub-marker.mic &  { background: #f472b6; }
+  .sub-marker.game & { background: #a3e635; }
 }
 .layout-upload-btn {
   background: #161616; border: 1px solid #2a2a2a; color: #cbd5e1;
