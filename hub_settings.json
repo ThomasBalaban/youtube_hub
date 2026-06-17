@@ -27,5 +27,11 @@
       "game_subtitle_y": 0.9425926024211202
     }
   ],
-  "active_preset": "layout"
+  "active_preset": "layout",
+  "schedule_times": [
+    "12:00",
+    "16:00",
+    "18:00",
+    "20:00"
+  ]
 }
