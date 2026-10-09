@@ -28,6 +28,7 @@ interface SubtitlerSettings {
   output_dir: string;
   enable_trimming: boolean;
   camera_mode: CameraMode;
+  mic_subtitles_enabled: boolean;
   game_subtitles_enabled: boolean;
   onomatopoeia_enabled: boolean;
   mic_track_index: string;
@@ -112,6 +113,7 @@ export class SubtitlerPageComponent extends PollingComponent {
     output_dir:     '',
     enable_trimming: true,
     camera_mode: 'vtuber',
+    mic_subtitles_enabled: true,
     game_subtitles_enabled: true,
     onomatopoeia_enabled: true,
     mic_track_index: 'a:1',
@@ -193,6 +195,7 @@ export class SubtitlerPageComponent extends PollingComponent {
   setSyncOffset(v: number)      { this.settings.update(s => ({ ...s, sync_offset: +v })); }
   setOutputDir(v: string)       { this.settings.update(s => ({ ...s, output_dir: v })); }
   toggleTrimming()              { this.settings.update(s => ({ ...s, enable_trimming: !s.enable_trimming })); }
+  toggleMicSubtitles()          { this.settings.update(s => ({ ...s, mic_subtitles_enabled: !s.mic_subtitles_enabled })); }
   toggleGameSubtitles()         { this.settings.update(s => ({ ...s, game_subtitles_enabled: !s.game_subtitles_enabled })); }
   toggleOnomatopoeia()          { this.settings.update(s => ({ ...s, onomatopoeia_enabled: !s.onomatopoeia_enabled })); }
   setMicTrack(v: string)        { this.settings.update(s => ({ ...s, mic_track_index: v })); }

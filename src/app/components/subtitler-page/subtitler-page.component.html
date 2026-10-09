@@ -122,6 +122,15 @@
           </div>
           <div class="setting-row">
             <div class="setting-info">
+              <span class="setting-name">Mic Subtitles</span>
+              <span class="setting-desc">Show subtitles transcribed from the mic/voice audio track</span>
+            </div>
+            <button class="toggle" [class.on]="settings().mic_subtitles_enabled" (click)="toggleMicSubtitles()">
+              <span class="toggle-knob"></span>
+            </button>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
               <span class="setting-name">Game Subtitles</span>
               <span class="setting-desc">Show subtitles transcribed from the game/desktop audio track</span>
             </div>
@@ -383,10 +392,12 @@
                 </div>
 
                 <!-- Subtitle position markers (drag vertically) -->
-                <div class="sub-marker mic" [style]="subStyle(micSubY())"
-                     (mousedown)="onSubMarkerDown($event, 'mic')">
-                  <span class="sub-marker-tag">Mic subs</span>
-                </div>
+                @if (settings().mic_subtitles_enabled) {
+                  <div class="sub-marker mic" [style]="subStyle(micSubY())"
+                       (mousedown)="onSubMarkerDown($event, 'mic')">
+                    <span class="sub-marker-tag">Mic subs</span>
+                  </div>
+                }
                 @if (settings().game_subtitles_enabled) {
                   <div class="sub-marker game" [style]="subStyle(gameSubY())"
                        (mousedown)="onSubMarkerDown($event, 'game')">

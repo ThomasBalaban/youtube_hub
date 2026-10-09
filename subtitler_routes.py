@@ -23,6 +23,7 @@ DEFAULTS: dict = {
     "enable_trimming": True,
     # Processing toggles / inputs (global).
     "camera_mode": "vtuber",          # "vtuber" | "facecam" | "none"
+    "mic_subtitles_enabled": True,
     "game_subtitles_enabled": True,
     "onomatopoeia_enabled": True,
     "mic_track_index": "a:1",
@@ -39,6 +40,7 @@ class SubtitlerSettings(BaseModel):
     output_dir: str
     enable_trimming: bool
     camera_mode: str = "vtuber"
+    mic_subtitles_enabled: bool = True
     game_subtitles_enabled: bool = True
     onomatopoeia_enabled: bool = True
     mic_track_index: str = "a:1"
