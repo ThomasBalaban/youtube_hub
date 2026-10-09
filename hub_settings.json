@@ -3,6 +3,7 @@
   "sync_offset": -0.15,
   "output_dir": "/Users/thomasbalaban/Downloads/projects/youtube-automator/shorts-auto-editor/output",
   "enable_trimming": true,
+  "mic_subtitles_enabled": false,
   "game_subtitles_enabled": false,
   "onomatopoeia_enabled": false,
   "mic_track_index": "a:1",
