@@ -35,6 +35,7 @@ interface SubtitlerSettings {
   game_track_index: string;
   end_card_enabled: boolean;
   sparse_cuts_enabled: boolean;
+  transcription_engine: string;
 }
 
 const AUDIO_TRACKS = ['a:0', 'a:1', 'a:2', 'a:3'];
@@ -122,7 +123,9 @@ export class SubtitlerPageComponent extends PollingComponent {
     game_track_index: 'a:2',
     end_card_enabled: false,
     sparse_cuts_enabled: false,
+    transcription_engine: 'gemini',
   });
+  readonly transcriptionEngines = ['gemini', 'whisper'];
   readonly audioTracks = AUDIO_TRACKS;
   analyzerStatus = signal<AnalyzerStatus | null>(null);
   serviceStatus  = signal<ServiceStatus | null>(null);
@@ -204,6 +207,7 @@ export class SubtitlerPageComponent extends PollingComponent {
   toggleOnomatopoeia()          { this.settings.update(s => ({ ...s, onomatopoeia_enabled: !s.onomatopoeia_enabled })); }
   toggleEndCard()               { this.settings.update(s => ({ ...s, end_card_enabled: !s.end_card_enabled })); }
   toggleSparseCuts()            { this.settings.update(s => ({ ...s, sparse_cuts_enabled: !s.sparse_cuts_enabled })); }
+  setTranscriptionEngine(v: string) { this.settings.update(s => ({ ...s, transcription_engine: v })); }
   setMicTrack(v: string)        { this.settings.update(s => ({ ...s, mic_track_index: v })); }
   setGameTrack(v: string)       { this.settings.update(s => ({ ...s, game_track_index: v })); }
 

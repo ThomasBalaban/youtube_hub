@@ -31,6 +31,7 @@ DEFAULTS: dict = {
     # Experiment primitives (2026-10) — default OFF, flip per batch.
     "end_card_enabled": False,
     "sparse_cuts_enabled": False,
+    "transcription_engine": "gemini",   # "gemini" | "whisper"
     # Layout presets for zoom focus, edited from the subtitler "Layout" tab.
     "region_presets": [],
     "active_preset": "",
@@ -50,6 +51,7 @@ class SubtitlerSettings(BaseModel):
     game_track_index: str = "a:2"
     end_card_enabled: bool = False
     sparse_cuts_enabled: bool = False
+    transcription_engine: str = "gemini"
 
 
 class RegionsPayload(BaseModel):

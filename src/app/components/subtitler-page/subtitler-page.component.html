@@ -95,6 +95,15 @@
           </div>
           <div class="setting-row">
             <div class="setting-info">
+              <span class="setting-name">Transcription</span>
+              <span class="setting-desc">gemini: faster, better recall, speaker labels — falls back to whisper on failure</span>
+            </div>
+            <select class="setting-select" [ngModel]="settings().transcription_engine" (ngModelChange)="setTranscriptionEngine($event)">
+              @for (e of transcriptionEngines; track e) { <option [value]="e">{{ e }}</option> }
+            </select>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
               <span class="setting-name">Mic Audio Track</span>
               <span class="setting-desc">Which recording track holds your voice</span>
             </div>
