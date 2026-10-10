@@ -28,6 +28,9 @@ DEFAULTS: dict = {
     "onomatopoeia_enabled": True,
     "mic_track_index": "a:1",
     "game_track_index": "a:2",
+    # Experiment primitives (2026-10) — default OFF, flip per batch.
+    "end_card_enabled": False,
+    "sparse_cuts_enabled": False,
     # Layout presets for zoom focus, edited from the subtitler "Layout" tab.
     "region_presets": [],
     "active_preset": "",
@@ -45,6 +48,8 @@ class SubtitlerSettings(BaseModel):
     onomatopoeia_enabled: bool = True
     mic_track_index: str = "a:1"
     game_track_index: str = "a:2"
+    end_card_enabled: bool = False
+    sparse_cuts_enabled: bool = False
 
 
 class RegionsPayload(BaseModel):
