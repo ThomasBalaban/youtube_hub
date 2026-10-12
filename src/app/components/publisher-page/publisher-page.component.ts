@@ -80,7 +80,7 @@ export class PublisherPageComponent extends PollingComponent {
   protected override pollingInterval = 4000;
 
   readonly MODE_META = MODE_META;
-  readonly modes: RunMode[] = ['scraping', 'publisher_batch', 'uploader', 'check_unuploaded'];
+  readonly modes: RunMode[] = ['scraping', 'uploader', 'check_unuploaded', 'publisher_batch'];
   readonly Math = Math;
 
   // ── Publisher controls ────────────────────────────────────────────────────
