@@ -4,14 +4,12 @@
 
 ## Editor roadmap (added 2026-10-12, while awaiting first experiment outcomes)
 
-- [ ] **New editing primitives as experiment arms** — each toggleable,
-      default OFF, so Phase 4/5 can score them on a batch slice:
-      arrow/annotation overlay (capability-gaps #1, 5x lift on weak n),
-      punch-in + micro-freeze on the punchline (uses trim punch_point),
-      speed-ramp into the punch, caption-style variant slice.
-- [ ] Deferred Phase 2 cost items: batch the onomatopoeia/director vision
-      calls (dozens per clip today); one Gemini upload per cut (planner and
-      trimmer currently upload the same video separately).
+- [ ] **Remaining editing primitives** (punch-freeze shipped 2026-10-16):
+      arrow/annotation overlay (needs semantic target placement — the
+      capability-gaps critic says prototype manually first), speed-ramp
+      into the punch (blocked: time manipulation desyncs subtitles /
+      events / zoom timelines — needs a timing-remap layer), caption-style
+      variant slice (moot while subtitles are off channel-wide).
 - [ ] **(Low priority) Voice fingerprinting for mixed-audio mode** — the
       dominant-speaker heuristic picks whoever talks most in the clip, which
       misattributed a chatty friend as the streamer (seen 2026-10-15). Fix:
