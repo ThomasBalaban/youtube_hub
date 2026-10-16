@@ -4,7 +4,7 @@
 
 ## Editor roadmap (added 2026-10-12, while awaiting first experiment outcomes)
 
-- [ ] **Tunability (`effects_settings`)** — pull hardcoded editor knobs
+- [x] **Tunability (`effects_settings`)** (done 2026-10-15) — pull hardcoded editor knobs
       (zoom intensity, onomatopoeia density, pacing aggressiveness) into a
       hub-editable settings block, stamped into metadata. Prerequisite for
       MISSION Phase 6 (concluded experiments changing editor defaults with
@@ -14,7 +14,7 @@
       arrow/annotation overlay (capability-gaps #1, 5x lift on weak n),
       punch-in + micro-freeze on the punchline (uses trim punch_point),
       speed-ramp into the punch, caption-style variant slice.
-- [ ] **Mixed-audio rescue mode** — use gemini-3.5-transcribe speaker
+- [x] **Mixed-audio rescue mode** (done 2026-10-15) — use gemini-3.5-transcribe speaker
       diarization to keep only the dominant speaker as the mic transcript
       on fully-mixed recordings; unshelves the series that has no separate
       audio tracks.

@@ -32,6 +32,16 @@ DEFAULTS: dict = {
     "end_card_enabled": False,
     "sparse_cuts_enabled": False,
     "transcription_engine": "gemini",   # "gemini" | "whisper"
+    "mixed_audio_mode": False,
+    # Effects knobs (effects_settings)
+    "fx_trim_target_min_s": 12.0,
+    "fx_trim_target_max_s": 45.0,
+    "fx_trim_max_pause_s": 1.5,
+    "fx_trim_end_within_s": 3.0,
+    "fx_pre_punch_beat_s": 1.5,
+    "fx_zoom_intensity": 1.0,
+    "fx_zoom_ramp_portion": 0.6,
+    "fx_end_card_seconds": 2.0,
     # Layout presets for zoom focus, edited from the subtitler "Layout" tab.
     "region_presets": [],
     "active_preset": "",
@@ -52,6 +62,15 @@ class SubtitlerSettings(BaseModel):
     end_card_enabled: bool = False
     sparse_cuts_enabled: bool = False
     transcription_engine: str = "gemini"
+    mixed_audio_mode: bool = False
+    fx_trim_target_min_s: float = 12.0
+    fx_trim_target_max_s: float = 45.0
+    fx_trim_max_pause_s: float = 1.5
+    fx_trim_end_within_s: float = 3.0
+    fx_pre_punch_beat_s: float = 1.5
+    fx_zoom_intensity: float = 1.0
+    fx_zoom_ramp_portion: float = 0.6
+    fx_end_card_seconds: float = 2.0
 
 
 class RegionsPayload(BaseModel):

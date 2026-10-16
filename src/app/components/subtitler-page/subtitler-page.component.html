@@ -174,6 +174,25 @@
               <span class="toggle-knob"></span>
             </button>
           </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">Mixed Audio Mode</span>
+              <span class="setting-desc">For recordings with no separate tracks: AI splits speakers — your voice becomes the mic transcript</span>
+            </div>
+            <button class="toggle" [class.on]="settings().mixed_audio_mode" (click)="toggleMixedAudio()">
+              <span class="toggle-knob"></span>
+            </button>
+          </div>
+          @for (k of fxKnobs; track k.key) {
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-name">{{ k.label }}</span>
+                <span class="setting-desc">{{ k.desc }}</span>
+              </div>
+              <input class="count-input" type="number" [step]="k.step"
+                     [ngModel]="fxValue(k.key)" (ngModelChange)="setFx(k.key, $event)">
+            </div>
+          }
           @if (settings().onomatopoeia_enabled) {
             <div class="setting-row">
               <div class="setting-info">

@@ -36,6 +36,15 @@ interface SubtitlerSettings {
   end_card_enabled: boolean;
   sparse_cuts_enabled: boolean;
   transcription_engine: string;
+  mixed_audio_mode: boolean;
+  fx_trim_target_min_s: number;
+  fx_trim_target_max_s: number;
+  fx_trim_max_pause_s: number;
+  fx_trim_end_within_s: number;
+  fx_pre_punch_beat_s: number;
+  fx_zoom_intensity: number;
+  fx_zoom_ramp_portion: number;
+  fx_end_card_seconds: number;
 }
 
 const AUDIO_TRACKS = ['a:0', 'a:1', 'a:2', 'a:3'];
@@ -124,7 +133,26 @@ export class SubtitlerPageComponent extends PollingComponent {
     end_card_enabled: false,
     sparse_cuts_enabled: false,
     transcription_engine: 'gemini',
+    mixed_audio_mode: false,
+    fx_trim_target_min_s: 12,
+    fx_trim_target_max_s: 45,
+    fx_trim_max_pause_s: 1.5,
+    fx_trim_end_within_s: 3,
+    fx_pre_punch_beat_s: 1.5,
+    fx_zoom_intensity: 1.0,
+    fx_zoom_ramp_portion: 0.6,
+    fx_end_card_seconds: 2.0,
   });
+  readonly fxKnobs: { key: string; label: string; desc: string; step: number }[] = [
+    { key: 'fx_trim_target_min_s',  label: 'Trim Min (s)',        desc: 'Shortest acceptable cut',                      step: 1 },
+    { key: 'fx_trim_target_max_s',  label: 'Trim Max (s)',        desc: 'Longest acceptable cut',                       step: 1 },
+    { key: 'fx_trim_max_pause_s',   label: 'Max Pause (s)',       desc: 'Pauses longer than this get cut',              step: 0.1 },
+    { key: 'fx_trim_end_within_s',  label: 'End Within (s)',      desc: 'End this soon after the punchline',            step: 0.5 },
+    { key: 'fx_pre_punch_beat_s',   label: 'Pre-Punch Beat (s)',  desc: 'Silence preserved before the punchline',       step: 0.1 },
+    { key: 'fx_zoom_intensity',     label: 'Zoom Intensity',      desc: '1.0 = current zooms; higher = punchier',       step: 0.1 },
+    { key: 'fx_zoom_ramp_portion',  label: 'Zoom Ramp',           desc: 'Portion of a zoom spent ramping (0–1)',        step: 0.05 },
+    { key: 'fx_end_card_seconds',   label: 'End Card (s)',        desc: 'Freeze-frame end card duration',               step: 0.5 },
+  ];
   readonly transcriptionEngines = ['gemini', 'whisper'];
   readonly audioTracks = AUDIO_TRACKS;
   analyzerStatus = signal<AnalyzerStatus | null>(null);
@@ -208,6 +236,9 @@ export class SubtitlerPageComponent extends PollingComponent {
   toggleEndCard()               { this.settings.update(s => ({ ...s, end_card_enabled: !s.end_card_enabled })); }
   toggleSparseCuts()            { this.settings.update(s => ({ ...s, sparse_cuts_enabled: !s.sparse_cuts_enabled })); }
   setTranscriptionEngine(v: string) { this.settings.update(s => ({ ...s, transcription_engine: v })); }
+  toggleMixedAudio()            { this.settings.update(s => ({ ...s, mixed_audio_mode: !s.mixed_audio_mode })); }
+  setFx(key: string, v: any)    { this.settings.update(s => ({ ...s, [key]: +v })); }
+  fxValue(key: string): number  { return (this.settings() as any)[key]; }
   setMicTrack(v: string)        { this.settings.update(s => ({ ...s, mic_track_index: v })); }
   setGameTrack(v: string)       { this.settings.update(s => ({ ...s, game_track_index: v })); }
 
