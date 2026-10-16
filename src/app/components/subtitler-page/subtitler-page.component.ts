@@ -797,6 +797,16 @@ export class SubtitlerPageComponent extends PollingComponent {
 
   // ── Processing control ─────────────────────────────────────────────────────
   async startProcessing() {
+    // Start = run with the panel EXACTLY as shown. Push the current
+    // settings to the editor first (runtime only — Save Settings is what
+    // persists them as defaults). Two test runs were silently voided by
+    // unsaved toggles before this existed.
+    if (this.apiOnline()) {
+      await fetch('/shorts-editor/settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.settings()),
+      }).catch(() => {});
+    }
     await fetch('/shorts-editor/process/start', { method: 'POST' }).catch(() => {});
     await this.poll();
   }

@@ -3,11 +3,25 @@
   "sync_offset": -0.15,
   "output_dir": "/Users/thomasbalaban/Downloads/projects/youtube-automator/shorts-auto-editor/output",
   "enable_trimming": true,
-  "mic_subtitles_enabled": false,
-  "game_subtitles_enabled": false,
+  "camera_mode": "vtuber",
+  "mic_subtitles_enabled": true,
+  "game_subtitles_enabled": true,
   "onomatopoeia_enabled": false,
   "mic_track_index": "a:1",
   "game_track_index": "a:2",
+  "end_card_enabled": false,
+  "sparse_cuts_enabled": false,
+  "transcription_engine": "gemini",
+  "mixed_audio_mode": true,
+  "fx_trim_target_min_s": 12.0,
+  "fx_trim_target_max_s": 45.0,
+  "fx_trim_max_pause_s": 1.5,
+  "fx_trim_end_within_s": 3.0,
+  "fx_pre_punch_beat_s": 1.5,
+  "fx_zoom_intensity": 1.0,
+  "fx_zoom_ramp_portion": 0.6,
+  "fx_end_card_seconds": 2.0,
+  "fx_thinker_control": false,
   "region_presets": [
     {
       "name": "layout",
@@ -28,11 +42,5 @@
       "game_subtitle_y": 0.9425926024211202
     }
   ],
-  "active_preset": "layout",
-  "schedule_times": [
-    "12:00",
-    "16:00",
-    "18:00",
-    "20:00"
-  ]
+  "active_preset": "layout"
 }
