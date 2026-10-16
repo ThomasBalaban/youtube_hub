@@ -19,24 +19,6 @@
       instead of per-clip word counts. Low priority because in a proper
       recording setup friends don't share the streamer's mic track.
 
-## Done
-
-- [x] Tunability (`effects_settings`) — 8 fx_* knobs, hub "Advanced Tuning"
-      section, stamped into metadata; plus Thinker Tuning opt-in overlay
-      (Phase 6) fed by the strategist's effects_tuning task. (2026-10-15)
-- [x] Mixed-audio rescue mode — diarization splits the mic line (dominant
-      speaker → mic transcript, friends + real game track → desktop);
-      works for shared mic lines and fully-mixed recordings. (2026-10-15)
-- [x] Clean render pipeline v2 — single-pass multi-track trim, stream-copy
-      zoom concat with intact source audio, duration guard, CRF 18.
-      (2026-10-14/15)
-- [x] Centralize API keys in `youtube_hub/config/secrets.json` and migrate
-      sibling apps (`shorts_analyzer`, `shorts_strategist`, `shorts-auto-editor`,
-      `youtube_shorts_publisher`) to read from `shared_secrets.py`.
-- [x] Centralize YouTube OAuth (client_secret + tokens) under
-      `youtube_hub/config/oauth/`. Analyzer analytics + publisher draft scanner
-      now resolve their paths via `shared_secrets.get_oauth_*`.
-
 ## Loose ends from the migration
 
 - The old per-project `config.json` files still exist and still contain copies
