@@ -30,6 +30,7 @@ DEFAULTS: dict = {
     "game_track_index": "a:2",
     # Experiment primitives (2026-10) — default OFF, flip per batch.
     "end_card_enabled": False,
+    "punch_freeze_enabled": False,
     "sparse_cuts_enabled": False,
     "transcription_engine": "gemini",   # "gemini" | "whisper"
     "mixed_audio_mode": False,
@@ -42,6 +43,7 @@ DEFAULTS: dict = {
     "fx_zoom_intensity": 1.0,
     "fx_zoom_ramp_portion": 0.6,
     "fx_end_card_seconds": 2.0,
+    "fx_punch_freeze_s": 0.5,
     "fx_thinker_control": False,
     # Layout presets for zoom focus, edited from the subtitler "Layout" tab.
     "region_presets": [],
@@ -61,6 +63,7 @@ class SubtitlerSettings(BaseModel):
     mic_track_index: str = "a:1"
     game_track_index: str = "a:2"
     end_card_enabled: bool = False
+    punch_freeze_enabled: bool = False
     sparse_cuts_enabled: bool = False
     transcription_engine: str = "gemini"
     mixed_audio_mode: bool = False
@@ -72,6 +75,7 @@ class SubtitlerSettings(BaseModel):
     fx_zoom_intensity: float = 1.0
     fx_zoom_ramp_portion: float = 0.6
     fx_end_card_seconds: float = 2.0
+    fx_punch_freeze_s: float = 0.5
     fx_thinker_control: bool = False
 
 
