@@ -34,7 +34,6 @@ interface SubtitlerSettings {
   mic_track_index: string;
   game_track_index: string;
   end_card_enabled: boolean;
-  punch_freeze_enabled: boolean;
   sparse_cuts_enabled: boolean;
   transcription_engine: string;
   mixed_audio_mode: boolean;
@@ -46,7 +45,6 @@ interface SubtitlerSettings {
   fx_zoom_intensity: number;
   fx_zoom_ramp_portion: number;
   fx_end_card_seconds: number;
-  fx_punch_freeze_s: number;
   fx_thinker_control: boolean;
 }
 
@@ -134,7 +132,6 @@ export class SubtitlerPageComponent extends PollingComponent {
     mic_track_index: 'a:1',
     game_track_index: 'a:2',
     end_card_enabled: false,
-    punch_freeze_enabled: false,
     sparse_cuts_enabled: false,
     transcription_engine: 'gemini',
     mixed_audio_mode: false,
@@ -146,7 +143,6 @@ export class SubtitlerPageComponent extends PollingComponent {
     fx_zoom_intensity: 1.0,
     fx_zoom_ramp_portion: 0.6,
     fx_end_card_seconds: 2.0,
-    fx_punch_freeze_s: 0.5,
     fx_thinker_control: false,
   });
   showAdvanced = signal(false);
@@ -159,7 +155,6 @@ export class SubtitlerPageComponent extends PollingComponent {
     { key: 'fx_zoom_intensity',     label: 'Zoom Intensity',      desc: '1.0 = current zooms; higher = punchier',       step: 0.1 },
     { key: 'fx_zoom_ramp_portion',  label: 'Zoom Ramp',           desc: 'Portion of a zoom spent ramping (0–1)',        step: 0.05 },
     { key: 'fx_end_card_seconds',   label: 'End Card (s)',        desc: 'Freeze-frame end card duration',               step: 0.5 },
-    { key: 'fx_punch_freeze_s',     label: 'Punch Freeze (s)',    desc: 'Frame-hold length at the punchline',           step: 0.1 },
   ];
   readonly transcriptionEngines = ['gemini', 'whisper'];
   readonly audioTracks = AUDIO_TRACKS;
@@ -242,7 +237,6 @@ export class SubtitlerPageComponent extends PollingComponent {
   toggleGameSubtitles()         { this.settings.update(s => ({ ...s, game_subtitles_enabled: !s.game_subtitles_enabled })); }
   toggleOnomatopoeia()          { this.settings.update(s => ({ ...s, onomatopoeia_enabled: !s.onomatopoeia_enabled })); }
   toggleEndCard()               { this.settings.update(s => ({ ...s, end_card_enabled: !s.end_card_enabled })); }
-  togglePunchFreeze()           { this.settings.update(s => ({ ...s, punch_freeze_enabled: !s.punch_freeze_enabled })); }
   toggleSparseCuts()            { this.settings.update(s => ({ ...s, sparse_cuts_enabled: !s.sparse_cuts_enabled })); }
   setTranscriptionEngine(v: string) { this.settings.update(s => ({ ...s, transcription_engine: v })); }
   toggleMixedAudio()            { this.settings.update(s => ({ ...s, mixed_audio_mode: !s.mixed_audio_mode })); }

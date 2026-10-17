@@ -4,12 +4,14 @@
 
 ## Editor roadmap (added 2026-10-12, while awaiting first experiment outcomes)
 
-- [ ] **Remaining editing primitives** (punch-freeze shipped 2026-10-16):
-      arrow/annotation overlay (needs semantic target placement — the
-      capability-gaps critic says prototype manually first), speed-ramp
-      into the punch (blocked: time manipulation desyncs subtitles /
-      events / zoom timelines — needs a timing-remap layer), caption-style
-      variant slice (moot while subtitles are off channel-wide).
+- [ ] **Remaining editing primitives**: arrow/annotation overlay (needs
+      semantic target placement — the capability-gaps critic says prototype
+      manually first), speed-ramp into the punch (blocked: time manipulation
+      desyncs subtitles / events / zoom timelines — needs a timing-remap
+      layer), caption-style variant slice (moot while subtitles are off
+      channel-wide). NOTE: punch-freeze was built 2026-10-16 and
+      human-vetoed same day — a bare frame-hold reads as lag; don't rebuild
+      without a visual treatment that signals intent.
 - [ ] **(Low priority) Voice fingerprinting for mixed-audio mode** — the
       dominant-speaker heuristic picks whoever talks most in the clip, which
       misattributed a chatty friend as the streamer (seen 2026-10-15). Fix:
