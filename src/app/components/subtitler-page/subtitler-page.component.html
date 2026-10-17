@@ -176,6 +176,15 @@
           </div>
           <div class="setting-row">
             <div class="setting-info">
+              <span class="setting-name">Auto Cam Detection</span>
+              <span class="setting-desc">AI locates the cam/vtuber overlay per video for zoom focus — falls back to your Layout preset when unsure</span>
+            </div>
+            <button class="toggle" [class.on]="settings().auto_cam_detect" (click)="toggleAutoCamDetect()">
+              <span class="toggle-knob"></span>
+            </button>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
               <span class="setting-name">Mixed Audio Mode</span>
               <span class="setting-desc">AI splits speakers on the mic track: your voice becomes the mic transcript; Discord friends join the game audio in the desktop transcript. Works for shared mic lines and fully-mixed recordings</span>
             </div>

@@ -28,6 +28,7 @@ interface SubtitlerSettings {
   output_dir: string;
   enable_trimming: boolean;
   camera_mode: CameraMode;
+  auto_cam_detect: boolean;
   mic_subtitles_enabled: boolean;
   game_subtitles_enabled: boolean;
   onomatopoeia_enabled: boolean;
@@ -126,6 +127,7 @@ export class SubtitlerPageComponent extends PollingComponent {
     output_dir:     '',
     enable_trimming: true,
     camera_mode: 'vtuber',
+    auto_cam_detect: false,
     mic_subtitles_enabled: true,
     game_subtitles_enabled: true,
     onomatopoeia_enabled: true,
@@ -239,6 +241,7 @@ export class SubtitlerPageComponent extends PollingComponent {
   toggleEndCard()               { this.settings.update(s => ({ ...s, end_card_enabled: !s.end_card_enabled })); }
   toggleSparseCuts()            { this.settings.update(s => ({ ...s, sparse_cuts_enabled: !s.sparse_cuts_enabled })); }
   setTranscriptionEngine(v: string) { this.settings.update(s => ({ ...s, transcription_engine: v })); }
+  toggleAutoCamDetect()         { this.settings.update(s => ({ ...s, auto_cam_detect: !s.auto_cam_detect })); }
   toggleMixedAudio()            { this.settings.update(s => ({ ...s, mixed_audio_mode: !s.mixed_audio_mode })); }
   toggleThinkerControl()        { this.settings.update(s => ({ ...s, fx_thinker_control: !s.fx_thinker_control })); }
   setFx(key: string, v: any)    { this.settings.update(s => ({ ...s, [key]: +v })); }
