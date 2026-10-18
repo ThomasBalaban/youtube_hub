@@ -134,6 +134,19 @@ SERVICE_DEFS: Dict[str, Dict[str, Any]] = {
         "color_hint":   "#fb923c",     # orange
     },
 
+    "longform_editor_api": {
+        "label":        "Long-form Editor API",
+        "description":  "Turns multi-hour stream VODs into 20-30 minute highlight videos: mined candidates, Pro-built edit plan (reviewable EDL), sparse zooms + rare captions",
+        "cmd":          [conda_python("simpleautosubs"), "-u", "api_server.py"],
+        "cwd":          os.path.join(PARENT_DIR, "longform_editor"),
+        "port":         9023,
+        "health_check": "http",
+        "health_url":   "http://localhost:9023/health",
+        "managed":      True,
+        "is_gui":       False,
+        "color_hint":   "#c084fc",     # violet
+    },
+
     # ── Template for future projects ──────────────────────────────────────────
     # "my_new_project": {
     #     "label":        "My New Project",
