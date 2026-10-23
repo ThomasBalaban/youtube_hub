@@ -196,6 +196,7 @@ export class ShortsAnalyzerPageComponent extends PollingComponent {
   // Start-analysis form
   readonly channelUrl = 'https://www.youtube.com/@PeepingOtter/shorts';
   maxShorts     = signal(100);
+  recentN       = signal(30);
   startingJob   = signal(false);
   formError     = signal('');
 
@@ -516,7 +517,7 @@ export class ShortsAnalyzerPageComponent extends PollingComponent {
     try {
       const res = await fetch('/shorts-analyzer/analyze/start', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel_url: this.channelUrl, max_shorts: this.maxShorts() }),
+        body: JSON.stringify({ channel_url: this.channelUrl, max_shorts: this.maxShorts(), recent_n: this.recentN() }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));

@@ -30,6 +30,14 @@
                    (ngModelChange)="maxShorts.set(+$event)"
                    [disabled]="!apiOnline() || jobRunning()" />
           </label>
+          <label class="form-field form-field--inline">
+            <span class="form-label">Recent Cohort</span>
+            <input type="number" class="form-input form-input--num" min="1" max="500"
+                   [ngModel]="recentN()"
+                   (ngModelChange)="recentN.set(+$event)"
+                   [disabled]="!apiOnline() || jobRunning()"
+                   title="How many most-recent shorts always get analyzed — set it to cover everything published since the last run" />
+          </label>
           <div class="ctrl-row">
             <button class="btn btn-run"
                     [disabled]="!apiOnline() || jobRunning() || startingJob()"
