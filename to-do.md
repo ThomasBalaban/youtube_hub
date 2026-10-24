@@ -12,6 +12,21 @@
       siblings 1.55 vs 0.66 on no-hit days) — consider weighting slots
       toward evening regardless of cadence outcome.
 
+## Strategist support (added 2026-10-24)
+
+- [ ] **Deliberate experiment management** — register planned experiments
+      (cadence A/B, captions slice, knob splits) as ledger objects with
+      hypothesis + settings + measure-when, auto-evaluated at harvest,
+      instead of hand-run via to-do notes. (The strategist should already
+      be doing this.)
+- [ ] **Wider outcome signals** — pull retention curves, impressions/CTR,
+      and comment sentiment per video_id into the outcomes table; views
+      alone can't say WHERE viewers leave. (Likewise should already exist.)
+- [ ] **Mission-control surface** — the strategist's beliefs, ledger,
+      directives and harvest history, visible in the hub instead of JSON
+      artifacts; plus human talk-back (flag confounds like the
+      age-restricted video, veto/endorse directives, rate cuts).
+
 ## Editor roadmap (added 2026-10-12, while awaiting first experiment outcomes)
 
 - [ ] **Remaining editing primitives**: arrow/annotation overlay (needs
