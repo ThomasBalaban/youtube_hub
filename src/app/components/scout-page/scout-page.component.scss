@@ -1,0 +1,271 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+// Accent: emerald (#34d399) — matches service_defs color_hint
+
+.page-body {
+  flex: 1;
+  display: flex;
+  gap: 14px;
+  padding: 14px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.left-col {
+  width: 340px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.right-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.card {
+  background: #161616;
+  border: 1px solid #262626;
+  border-radius: 10px;
+  padding: 12px 14px;
+
+  h2 {
+    margin: 0 0 10px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #9ca3af;
+  }
+}
+
+.hint-inline {
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: #4b5563;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: 6px;
+}
+
+.muted { color: #6b7280; font-size: 0.8rem; margin: 0 0 8px; }
+.hint  { color: #4b5563; font-size: 0.68rem; margin: 6px 0 0; }
+
+// ── Buttons ───────────────────────────────────────────────────────────────
+.btn {
+  background: #1d1d1d;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: #d1d5db;
+  font-size: 0.76rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+
+  &:hover:not(:disabled) { background: #262626; border-color: #444; }
+  &:disabled { opacity: 0.45; cursor: not-allowed; }
+}
+
+.btn-run {
+  background: rgba(52, 211, 153, 0.12);
+  border-color: rgba(52, 211, 153, 0.4);
+  color: #6ee7b7;
+  &:hover:not(:disabled) { background: rgba(52, 211, 153, 0.22); }
+}
+
+.btn-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+// ── Status ────────────────────────────────────────────────────────────────
+.kv {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 0.78rem;
+  padding: 2px 0;
+
+  span { color: #6b7280; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; width: 64px; flex-shrink: 0; }
+  b    { color: #d1d5db; font-weight: 600; word-break: break-word; }
+  &.err b { color: #f87171; }
+}
+
+.err-line { color: #f87171; font-size: 0.74rem; margin: 8px 0 0; }
+
+.chips {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.chip {
+  background: #1b1b1b;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 7px 4px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  b    { font-size: 0.95rem; color: #6ee7b7; }
+  span { font-size: 0.58rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
+  &.warn b { color: #fbbf24; }
+}
+
+// ── Logs ──────────────────────────────────────────────────────────────────
+.logs-card { flex: 1; display: flex; flex-direction: column; min-height: 160px; }
+.logs {
+  flex: 1;
+  margin: 0;
+  background: #101010;
+  border: 1px solid #222;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 0.66rem;
+  line-height: 1.5;
+  color: #9ca3af;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 120px;
+}
+
+// ── Game heat table ───────────────────────────────────────────────────────
+.heat-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+
+  th {
+    text-align: left;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6b7280;
+    padding: 4px 8px;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  td {
+    padding: 6px 8px;
+    border-bottom: 1px dashed #222;
+    color: #d1d5db;
+    vertical-align: top;
+  }
+  .rank { color: #6b7280; width: 24px; }
+  .game { font-weight: 600; color: #6ee7b7; white-space: nowrap; }
+  .example a {
+    color: #93c5fd;
+    text-decoration: none;
+    &:hover { text-decoration: underline; }
+  }
+}
+
+// ── Audio craft ───────────────────────────────────────────────────────────
+.audio-card { border-color: rgba(52, 211, 153, 0.35); }
+
+.audio-grid {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.stat {
+  flex: 1;
+  background: #1b1b1b;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 10px 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+
+  b    { font-size: 1.15rem; color: #d1d5db; }
+  span { font-size: 0.62rem; color: #6b7280; }
+
+  &.big b { font-size: 1.5rem; color: #34d399; }
+}
+
+.tag-rows { display: flex; flex-direction: column; gap: 6px; }
+.tag-row  { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.tag-label {
+  font-size: 0.62rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  width: 76px;
+  flex-shrink: 0;
+}
+
+.pill {
+  background: #1d1d1d;
+  border: 1px solid #2e2e2e;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 0.68rem;
+  color: #9ca3af;
+
+  b { color: #6ee7b7; margin-right: 3px; }
+}
+
+// ── Technique trends ──────────────────────────────────────────────────────
+.trend-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 5px 0;
+  & + .trend-row { border-top: 1px dashed #222; }
+}
+.trend-axis {
+  font-size: 0.64rem;
+  color: #6b7280;
+  width: 140px;
+  flex-shrink: 0;
+  font-family: monospace;
+}
+.trend-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+
+// ── Exemplars ─────────────────────────────────────────────────────────────
+.exemplar {
+  padding: 10px 0;
+  & + .exemplar { border-top: 1px solid #222; }
+
+  header {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 5px;
+  }
+  .ex-title {
+    color: #6ee7b7;
+    font-size: 0.84rem;
+    font-weight: 600;
+    text-decoration: none;
+    &:hover { text-decoration: underline; }
+  }
+  .ex-meta { font-size: 0.66rem; color: #6b7280; }
+  .ex-why  { margin: 0 0 5px; font-size: 0.76rem; color: #d1d5db; line-height: 1.45; }
+  .ex-techniques {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 0.72rem;
+    color: #9ca3af;
+    li { margin: 2px 0; }
+  }
+}

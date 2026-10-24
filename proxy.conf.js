@@ -33,4 +33,10 @@ module.exports = {
     pathRewrite: { '^/shorts-strategist': '' },
     bypass: bypassPageNav,
   },
+  '/shorts-scout': {
+    target: 'http://localhost:9024',
+    secure: false,
+    pathRewrite: { '^/shorts-scout': '' },
+    bypass: bypassPageNav,
+  },
 };

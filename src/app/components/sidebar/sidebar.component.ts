@@ -59,6 +59,14 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         <span class="nav-icon">🧠</span>
         <span class="nav-label">Strategy</span>
       </a>
+
+      <a routerLink="/scout"
+         routerLinkActive="active"
+         class="nav-item"
+         title="Shorts Scout — niche market intel">
+        <span class="nav-icon">🔭</span>
+        <span class="nav-label">Scout</span>
+      </a>
     </nav>
   `,
   styleUrl: './sidebar.component.scss',

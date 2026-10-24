@@ -1,0 +1,177 @@
+<app-page-header
+  title="Shorts Scout"
+  icon="🔭"
+  iconColor="#34d399"
+  [subLabel]="'niche market intel · ' + (apiOnline() ? 'online' : 'offline')" />
+
+<div class="page-body">
+
+  <!-- ── Left: controls + status ─────────────────────────────────────── -->
+  <aside class="left-col">
+
+    <section class="card">
+      <h2>Service</h2>
+      @if (!apiOnline()) {
+        <p class="muted">Scout API is offline.</p>
+        <button class="btn btn-run" (click)="startService()" [disabled]="starting()">
+          {{ starting() ? 'Starting…' : '▶ Start Scout API' }}
+        </button>
+        <p class="hint">launcher sees it: {{ svcState() }}</p>
+      } @else {
+        <div class="kv"><span>state</span><b>{{ running() ? ('running: ' + (status()?.stage ?? '…')) : 'idle' }}</b></div>
+        @if (status()?.last_result) { <div class="kv"><span>last</span><b>{{ status()?.last_result }}</b></div> }
+        @if (status()?.error) { <div class="kv err"><span>error</span><b>{{ status()?.error }}</b></div> }
+        <div class="kv"><span>updated</span><b>{{ lastUpdated() }}</b></div>
+      }
+      @if (actionError()) { <p class="err-line">{{ actionError() }}</p> }
+    </section>
+
+    <section class="card">
+      <h2>Run <span class="hint-inline">weekly = all stages in order</span></h2>
+      <div class="btn-grid">
+        @for (s of stages; track s) {
+          <button class="btn"
+                  [class.btn-run]="s === 'weekly'"
+                  (click)="run(s)"
+                  [disabled]="!apiOnline() || running()">
+            {{ s }}
+          </button>
+        }
+      </div>
+    </section>
+
+    @if (counts(); as c) {
+      <section class="card">
+        <h2>Pipeline state</h2>
+        <div class="chips">
+          <div class="chip"><b>{{ c.channels_admitted }}</b><span>roster</span></div>
+          <div class="chip"><b>{{ c.channels_pending }}</b><span>pending</span></div>
+          <div class="chip"><b>{{ c.videos }}</b><span>videos</span></div>
+          <div class="chip"><b>{{ c.outliers }}</b><span>outliers</span></div>
+          <div class="chip"><b>{{ c.outliers_unanalyzed }}</b><span>to analyze</span></div>
+          <div class="chip"><b>{{ c.analyses }}</b><span>analyzed</span></div>
+          <div class="chip"><b>{{ c.query_bank }}</b><span>queries</span></div>
+          <div class="chip" [class.warn]="c.quota_today > 5000"><b>{{ c.quota_today }}</b><span>quota today</span></div>
+        </div>
+      </section>
+    }
+
+    <section class="card logs-card">
+      <h2>Logs</h2>
+      <pre class="logs">@for (l of logs(); track $index) {{{ l }}
+}</pre>
+    </section>
+  </aside>
+
+  <!-- ── Right: market intel ─────────────────────────────────────────── -->
+  <main class="right-col">
+
+    @if (!feed()) {
+      <section class="card">
+        <h2>Market report</h2>
+        <p class="muted">No report yet — run <b>weekly</b> (or at least
+          discover → qualify → poll → outliers → analyze → report).</p>
+      </section>
+    } @else {
+
+      <section class="card">
+        <h2>Game heat
+          <span class="hint-inline">
+            {{ feed()?.totals?.analyzed }} analyzed / {{ feed()?.totals?.outliers }} outliers ·
+            window {{ feed()?.window_days }}d · {{ feed()?.generated_at?.slice(0, 10) }}
+          </span>
+        </h2>
+        <table class="heat-table">
+          <thead><tr><th>#</th><th>Game</th><th>Outliers</th><th>Heat</th><th>Views</th><th>Top example</th></tr></thead>
+          <tbody>
+            @for (g of feed()?.game_heat ?? []; track g.game; let i = $index) {
+              <tr>
+                <td class="rank">{{ i + 1 }}</td>
+                <td class="game">{{ g.game }}</td>
+                <td>{{ g.outliers }}</td>
+                <td>{{ g.score }}</td>
+                <td>{{ fmtViews(g.views) }}</td>
+                <td class="example">
+                  @if (g.examples[0]; as ex) {
+                    <a [href]="shortUrl(ex.video_id)" target="_blank" rel="noopener">
+                      {{ ex.breakout | number:'1.0-0' }}x · {{ ex.title }}
+                    </a>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
+
+      @if (audio(); as ac) {
+        <section class="card audio-card">
+          <h2>Audio craft <span class="hint-inline">n = {{ trends()?.sample_size }}</span></h2>
+          <div class="audio-grid">
+            <div class="stat big">
+              <b>{{ ac.punchline_sfx_pct }}%</b>
+              <span>of breakouts use punchline SFX</span>
+            </div>
+            <div class="stat">
+              <b>{{ ac.silence_before_scare_pct }}%</b>
+              <span>silence before the scare</span>
+            </div>
+            <div class="stat">
+              <b>{{ ac.median_sound_events_per_10s ?? '—' }}</b>
+              <span>median sound events / 10s</span>
+            </div>
+          </div>
+          <div class="tag-rows">
+            <div class="tag-row"><span class="tag-label">SFX types</span>
+              @for (e of objEntries(ac.sfx_types); track e[0]) { <span class="pill">{{ e[0] }} × {{ e[1] }}</span> }
+            </div>
+            <div class="tag-row"><span class="tag-label">Music</span>
+              @for (e of objEntries(ac.music_usage); track e[0]) { <span class="pill">{{ e[0] }} × {{ e[1] }}</span> }
+            </div>
+            <div class="tag-row"><span class="tag-label">Audio gags</span>
+              @for (e of objEntries(ac.audio_gags); track e[0]) { <span class="pill">{{ e[0] }} × {{ e[1] }}</span> }
+            </div>
+          </div>
+        </section>
+      }
+
+      <section class="card">
+        <h2>Technique trends</h2>
+        @for (axis of trendAxes; track axis) {
+          @if (trends()?.axes?.[axis]; as tags) {
+            @if (tags.length) {
+              <div class="trend-row">
+                <span class="trend-axis">{{ axis }}</span>
+                <div class="trend-tags">
+                  @for (t of tags.slice(0, 5); track t.tag) {
+                    <span class="pill"><b>{{ t.pct }}%</b> {{ t.tag }}</span>
+                  }
+                </div>
+              </div>
+            }
+          }
+        }
+      </section>
+
+      <section class="card">
+        <h2>Exemplars <span class="hint-inline">steal these techniques</span></h2>
+        @for (e of feed()?.exemplars ?? []; track e.video_id) {
+          <article class="exemplar">
+            <header>
+              <a [href]="shortUrl(e.video_id)" target="_blank" rel="noopener" class="ex-title">
+                {{ e.breakout | number:'1.1-1' }}x · {{ e.title }}
+              </a>
+              <span class="ex-meta">{{ e.channel }} · {{ fmtViews(e.views) }} views · {{ e.game }}</span>
+            </header>
+            <p class="ex-why">{{ e.why_it_worked }}</p>
+            @if (e.transferable_techniques.length) {
+              <ul class="ex-techniques">
+                @for (t of e.transferable_techniques; track t) { <li>{{ t }}</li> }
+              </ul>
+            }
+          </article>
+        }
+      </section>
+    }
+  </main>
+</div>

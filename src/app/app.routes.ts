@@ -5,6 +5,7 @@ import { SubtitlerPageComponent } from './components/subtitler-page/subtitler-pa
 import { BacktrackPageComponent } from './components/backtrack-page/backtrack-page.component';
 import { ShortsAnalyzerPageComponent } from './components/shorts-analyzer-page/shorts-analyzer-page.component';
 import { StrategistPageComponent } from './components/strategist-page/strategist-page.component';
+import { ScoutPageComponent } from './components/scout-page/scout-page.component';
 
 export const routes: Routes = [
   { path: 'backtrack',        component: BacktrackPageComponent },
@@ -12,5 +13,6 @@ export const routes: Routes = [
   { path: 'shorts-editor',    component: SubtitlerPageComponent },
   { path: 'shorts-analyzer',  component: ShortsAnalyzerPageComponent },
   { path: 'strategist',       component: StrategistPageComponent },
+  { path: 'scout',            component: ScoutPageComponent },
   { path: '**',               component: HubPageComponent },
 ];
