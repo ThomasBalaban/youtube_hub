@@ -14,6 +14,13 @@
 
 ## Strategist support (added 2026-10-24)
 
+- [ ] **Wire scout feed into the thinker** — shorts_scout writes
+      `shorts_scout/output/strategist_feed.json` (game heat, market
+      technique trends incl. audio-craft rates, exemplars). Feed it into
+      the scorecard + capability_gaps prompts (hash the feed's
+      generated_at so staleness is controlled), so gaps become market-
+      grounded ("71% of outliers use punchline SFX; we're at 0%") and
+      game recommendations surface. Scout itself shipped 2026-10-24.
 - [ ] **Deliberate experiment management** — register planned experiments
       (cadence A/B, captions slice, knob splits) as ledger objects with
       hypothesis + settings + measure-when, auto-evaluated at harvest,
