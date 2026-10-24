@@ -45,7 +45,6 @@ interface SubtitlerSettings {
   fx_zoom_intensity: number;
   fx_zoom_ramp_portion: number;
   fx_end_card_seconds: number;
-  fx_thinker_control: boolean;
 }
 
 const AUDIO_TRACKS = ['a:0', 'a:1', 'a:2', 'a:3'];
@@ -143,7 +142,6 @@ export class SubtitlerPageComponent extends PollingComponent {
     fx_zoom_intensity: 1.0,
     fx_zoom_ramp_portion: 0.6,
     fx_end_card_seconds: 2.0,
-    fx_thinker_control: false,
   });
   showAdvanced = signal(false);
   readonly fxKnobs: { key: string; label: string; desc: string; step: number }[] = [
@@ -240,7 +238,6 @@ export class SubtitlerPageComponent extends PollingComponent {
   toggleSparseCuts()            { this.settings.update(s => ({ ...s, sparse_cuts_enabled: !s.sparse_cuts_enabled })); }
   setTranscriptionEngine(v: string) { this.settings.update(s => ({ ...s, transcription_engine: v })); }
   toggleMixedAudio()            { this.settings.update(s => ({ ...s, mixed_audio_mode: !s.mixed_audio_mode })); }
-  toggleThinkerControl()        { this.settings.update(s => ({ ...s, fx_thinker_control: !s.fx_thinker_control })); }
   setFx(key: string, v: any)    { this.settings.update(s => ({ ...s, [key]: +v })); }
   fxValue(key: string): number  { return (this.settings() as any)[key]; }
   setMicTrack(v: string)        { this.settings.update(s => ({ ...s, mic_track_index: v })); }

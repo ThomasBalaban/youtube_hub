@@ -42,7 +42,6 @@ DEFAULTS: dict = {
     "fx_zoom_intensity": 1.0,
     "fx_zoom_ramp_portion": 0.6,
     "fx_end_card_seconds": 2.0,
-    "fx_thinker_control": False,
     # Layout presets for zoom focus, edited from the subtitler "Layout" tab.
     "region_presets": [],
     "active_preset": "",
@@ -72,7 +71,6 @@ class SubtitlerSettings(BaseModel):
     fx_zoom_intensity: float = 1.0
     fx_zoom_ramp_portion: float = 0.6
     fx_end_card_seconds: float = 2.0
-    fx_thinker_control: bool = False
 
 
 class RegionsPayload(BaseModel):

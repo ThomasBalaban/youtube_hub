@@ -186,24 +186,15 @@
           <div class="setting-row" (click)="showAdvanced.set(!showAdvanced())" style="cursor: pointer; user-select: none;">
             <div class="setting-info">
               <span class="setting-name">{{ showAdvanced() ? '▾' : '▸' }} Advanced Tuning</span>
-              <span class="setting-desc">Trim pacing, zoom strength, end-card timing — every value is stamped into the video's metadata</span>
+              <span class="setting-desc">Base values — the thinker auto-adjusts these from concluded experiments (bounded, provenance stamped per video)</span>
             </div>
           </div>
           @if (showAdvanced()) {
-            <div class="setting-row">
-              <div class="setting-info">
-                <span class="setting-name">🧠 Thinker Tuning</span>
-                <span class="setting-desc">Let the strategist adjust these knobs — only from concluded experiments, within safety bounds, with provenance per change</span>
-              </div>
-              <button class="toggle" [class.on]="settings().fx_thinker_control" (click)="toggleThinkerControl(); $event.stopPropagation()">
-                <span class="toggle-knob"></span>
-              </button>
-            </div>
             @for (k of fxKnobs; track k.key) {
               <div class="setting-row">
                 <div class="setting-info">
                   <span class="setting-name">{{ k.label }}</span>
-                  <span class="setting-desc">{{ k.desc }}{{ settings().fx_thinker_control ? ' (thinker may override)' : '' }}</span>
+                  <span class="setting-desc">{{ k.desc }}</span>
                 </div>
                 <input class="count-input" type="number" [step]="k.step"
                        [ngModel]="fxValue(k.key)" (ngModelChange)="setFx(k.key, $event)">
