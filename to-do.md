@@ -1,6 +1,16 @@
 # TODO
 
 - [ ] Auto-run items when Twitch starts / stops.
+- [ ] **Cadence A/B** (added 2026-10-24): schedule one upload batch at
+      2/day for a week, then 4/day for a week (Daily Post Times), and
+      compare absolute views-per-video at equal age. Breakout scores are
+      channel-median-relative so uniform volume suppression is invisible —
+      this is the only way to answer "is 4/day hurting reach?".
+      Side-finding from the Oct 22 harvest, worth folding in: the LAST
+      slot of the day strongly outperforms (median 1.61 vs 0.86-1.04
+      earlier slots) and same-day siblings LIFT each other (hit days:
+      siblings 1.55 vs 0.66 on no-hit days) — consider weighting slots
+      toward evening regardless of cadence outcome.
 
 ## Editor roadmap (added 2026-10-12, while awaiting first experiment outcomes)
 
