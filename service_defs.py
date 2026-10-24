@@ -147,6 +147,19 @@ SERVICE_DEFS: Dict[str, Dict[str, Any]] = {
         "color_hint":   "#c084fc",     # violet
     },
 
+    "shorts_scout_api": {
+        "label":        "Shorts Scout API",
+        "description":  "Market scout: discovers breakout gaming shorts in the horror/variety niche (official Data API, no seeded roster), deep-analyzes them via Gemini URL ingestion incl. audio craft, feeds game heat + technique trends to the strategist",
+        "cmd":          [conda_python("simpleautosubs"), "-u", "api_server.py"],
+        "cwd":          os.path.join(PARENT_DIR, "shorts_scout"),
+        "port":         9024,
+        "health_check": "http",
+        "health_url":   "http://localhost:9024/health",
+        "managed":      True,
+        "is_gui":       False,
+        "color_hint":   "#34d399",     # emerald
+    },
+
     # ── Template for future projects ──────────────────────────────────────────
     # "my_new_project": {
     #     "label":        "My New Project",
